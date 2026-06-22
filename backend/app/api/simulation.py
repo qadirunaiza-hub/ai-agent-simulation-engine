@@ -14,6 +14,7 @@ from ..services.oasis_profile_generator import OasisProfileGenerator
 from ..services.simulation_manager import SimulationManager, SimulationStatus
 from ..services.simulation_runner import SimulationRunner, RunnerStatus
 from ..utils.logger import get_logger
+from ..utils.auth_utils import get_current_user, login_required, admin_required
 from ..models.project import ProjectManager
 
 logger = get_logger('mirofish.api.simulation')
@@ -153,6 +154,7 @@ def get_entities_by_type(graph_id: str, entity_type: str):
 # ============== Simulation management interface ==============
 
 @simulation_bp.route('/create', methods=['POST'])
+@login_required
 def create_simulation():
     """
     Create new simulation
@@ -205,12 +207,14 @@ def create_simulation():
                 "error": "Project has not built knowledge graph yet, please call /api/graph/build first"
             }), 400
         
+        current_user = get_current_user()
         manager = SimulationManager()
         state = manager.create_simulation(
             project_id=project_id,
             graph_id=graph_id,
             enable_twitter=data.get('enable_twitter', True),
             enable_reddit=data.get('enable_reddit', True),
+            owner_user_id=current_user.user_id if current_user else None,
         )
         
         return jsonify({
@@ -866,6 +870,7 @@ def _get_report_id_for_simulation(simulation_id: str) -> str:
 
 
 @simulation_bp.route('/history', methods=['GET'])
+@login_required
 def get_simulation_history():
     """
     Get historical simulation list（With project details）
@@ -902,9 +907,17 @@ def get_simulation_history():
     """
     try:
         limit = request.args.get('limit', 20, type=int)
-        
+        current_user = get_current_user()
+
         manager = SimulationManager()
-        simulations = manager.list_simulations()[:limit]
+        all_sims = manager.list_simulations()
+
+        # Filter: users see only their own non-archived sims; admin sees ALL (including archived)
+        if current_user and current_user.role == 'admin':
+            simulations = all_sims[:limit]
+        else:
+            user_id = current_user.user_id if current_user else None
+            simulations = [s for s in all_sims if not s.archived and s.owner_user_id == user_id][:limit]
         
         # Enhance simulation data，Only from Simulation FileRead
         enriched_simulations = []
@@ -2709,3 +2722,338 @@ def close_simulation_env():
             "error": str(e),
             "traceback": traceback.format_exc()
         }), 500
+
+
+# ============== Ontology endpoint ==============
+
+@simulation_bp.route('/<simulation_id>/ontology', methods=['GET'])
+def get_simulation_ontology(simulation_id: str):
+    """Return the bag ontology (entity types + edge types) for the simulation's graph."""
+    try:
+        manager = SimulationManager()
+        state = manager.get_simulation(simulation_id)
+        if not state:
+            return jsonify({"success": False, "error": f"Simulation not found: {simulation_id}"}), 404
+
+        graph_id = state.graph_id
+        if not graph_id:
+            return jsonify({"success": False, "error": "No graph_id associated with simulation"}), 400
+
+        storage = current_app.extensions.get('neo4j_storage')
+        if not storage:
+            return jsonify({"success": False, "error": "GraphStorage not initialized"}), 503
+
+        ontology = storage.get_ontology(graph_id)
+        return jsonify({"success": True, "data": {"graph_id": graph_id, "ontology": ontology}})
+
+    except Exception as e:
+        logger.error(f"Failed to get ontology: {str(e)}")
+        return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
+
+
+# ============== Pause / Resume / Rearrange ==============
+
+@simulation_bp.route('/pause', methods=['POST'])
+def pause_simulation():
+    """Soft-stop a running simulation so the user can rearrange agents / inject events."""
+    try:
+        data = request.get_json() or {}
+        simulation_id = data.get('simulation_id')
+        if not simulation_id:
+            return jsonify({"success": False, "error": "simulation_id required"}), 400
+
+        run_state = SimulationRunner.stop_simulation(simulation_id)
+
+        manager = SimulationManager()
+        state = manager.get_simulation(simulation_id)
+        if state:
+            state.status = SimulationStatus.PAUSED
+            manager._save_simulation_state(state)
+
+        return jsonify({"success": True, "data": {**run_state.to_dict(), "paused": True}})
+
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"Failed to pause simulation: {str(e)}")
+        return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
+
+
+@simulation_bp.route('/<simulation_id>/agents', methods=['PUT'])
+def update_agent_configs(simulation_id: str):
+    """
+    Update agent configs while paused.
+    Body: { "agents": [{agent_id, activity_level, stance, ...}], "order": [id,...] }
+    """
+    try:
+        data = request.get_json() or {}
+        agents_patch = data.get('agents', [])
+
+        manager = SimulationManager()
+        sim_dir = manager._get_simulation_dir(simulation_id)
+        config_path = os.path.join(sim_dir, "simulation_config.json")
+
+        if not os.path.exists(config_path):
+            return jsonify({"success": False, "error": "simulation_config.json not found"}), 404
+
+        import json as _json
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = _json.load(f)
+
+        patch_by_id = {int(a['agent_id']): a for a in agents_patch if 'agent_id' in a}
+        agent_cfgs = config.get('agent_configs', [])
+
+        for ac in agent_cfgs:
+            aid = int(ac.get('agent_id', -1))
+            if aid in patch_by_id:
+                patch = patch_by_id[aid]
+                for field in ('activity_level', 'stance', 'sentiment_bias', 'posts_per_hour',
+                              'comments_per_hour', 'influence_weight'):
+                    if field in patch:
+                        ac[field] = patch[field]
+
+        new_order = data.get('order')
+        if new_order:
+            id_to_cfg = {int(ac.get('agent_id', -1)): ac for ac in agent_cfgs}
+            reordered = [id_to_cfg[int(aid)] for aid in new_order if int(aid) in id_to_cfg]
+            seen = {int(aid) for aid in new_order}
+            reordered += [ac for ac in agent_cfgs if int(ac.get('agent_id', -1)) not in seen]
+            for idx, ac in enumerate(reordered):
+                ac['agent_id'] = idx
+            config['agent_configs'] = reordered
+        else:
+            config['agent_configs'] = agent_cfgs
+
+        with open(config_path, 'w', encoding='utf-8') as f:
+            _json.dump(config, f, ensure_ascii=False, indent=2)
+
+        return jsonify({
+            "success": True,
+            "data": {"updated": len(agents_patch), "total_agents": len(config['agent_configs'])}
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to update agent configs: {str(e)}")
+        return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
+
+
+@simulation_bp.route('/resume', methods=['POST'])
+def resume_simulation():
+    """Resume a paused simulation (restart subprocess with existing config + preserved DB)."""
+    try:
+        data = request.get_json() or {}
+        simulation_id = data.get('simulation_id')
+        if not simulation_id:
+            return jsonify({"success": False, "error": "simulation_id required"}), 400
+
+        platform = data.get('platform', 'parallel')
+        max_rounds = data.get('max_rounds')
+
+        manager = SimulationManager()
+        state = manager.get_simulation(simulation_id)
+        if not state:
+            return jsonify({"success": False, "error": f"Simulation not found: {simulation_id}"}), 404
+
+        state.status = SimulationStatus.READY
+        manager._save_simulation_state(state)
+
+        run_state = SimulationRunner.start_simulation(
+            simulation_id=simulation_id,
+            platform=platform,
+            max_rounds=int(max_rounds) if max_rounds else None,
+            enable_graph_memory_update=False,
+        )
+
+        state.status = SimulationStatus.RUNNING
+        manager._save_simulation_state(state)
+
+        return jsonify({"success": True, "data": {**run_state.to_dict(), "resumed": True}})
+
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"Failed to resume simulation: {str(e)}")
+        return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
+
+
+@simulation_bp.route('/<simulation_id>/inject-event', methods=['POST'])
+def inject_event(simulation_id: str):
+    """
+    Inject a user-authored post into initial_posts in simulation_config.json.
+    Body: { "content": "...", "author": "SystemBot" }
+    """
+    try:
+        data = request.get_json() or {}
+        content = data.get('content', '').strip()
+        if not content:
+            return jsonify({"success": False, "error": "content is required"}), 400
+        author = data.get('author', 'UserInjection')
+
+        manager = SimulationManager()
+        sim_dir = manager._get_simulation_dir(simulation_id)
+        config_path = os.path.join(sim_dir, "simulation_config.json")
+
+        if not os.path.exists(config_path):
+            return jsonify({"success": False, "error": "simulation_config.json not found"}), 404
+
+        import json as _json
+        from datetime import datetime as _dt
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = _json.load(f)
+
+        new_post = {
+            "content": content,
+            "author_name": author,
+            "post_time": "0",
+            "injected_at": _dt.now().isoformat(),
+            "user_injected": True
+        }
+
+        event_config = config.setdefault('event_config', {})
+        initial_posts = event_config.setdefault('initial_posts', [])
+        initial_posts.insert(0, new_post)
+
+        with open(config_path, 'w', encoding='utf-8') as f:
+            _json.dump(config, f, ensure_ascii=False, indent=2)
+
+        return jsonify({
+            "success": True,
+            "data": {"injected": True, "total_initial_posts": len(initial_posts), "post": new_post}
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to inject event: {str(e)}")
+        return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
+
+
+@simulation_bp.route('/<simulation_id>/llm-calls', methods=['GET'])
+def get_simulation_llm_calls(simulation_id: str):
+    """Return LLM call transparency log for this simulation (from llm_calls.jsonl)."""
+    try:
+        manager = SimulationManager()
+        sim_dir = manager._get_simulation_dir(simulation_id)
+        log_path = os.path.join(sim_dir, "llm_calls.jsonl")
+
+        limit = request.args.get('limit', 100, type=int)
+        calls = []
+
+        if os.path.exists(log_path):
+            import json as _json
+            with open(log_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            calls.append(_json.loads(line))
+                        except Exception:
+                            pass
+
+        calls = list(reversed(calls))[:limit]
+        return jsonify({"success": True, "data": {"count": len(calls), "calls": calls}})
+
+    except Exception as e:
+        logger.error(f"Failed to get LLM calls: {str(e)}")
+        return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
+
+
+# ============== Delete simulation ==============
+
+@simulation_bp.route('/<simulation_id>', methods=['DELETE'])
+@login_required
+def delete_simulation(simulation_id: str):
+    """
+    Delete a simulation (owner or admin only).
+    Removes the simulation directory from disk.
+    """
+    import shutil
+    try:
+        current_user = get_current_user()
+        manager = SimulationManager()
+        state = manager.get_simulation(simulation_id)
+
+        if not state:
+            return jsonify({'success': False, 'error': f'Simulation not found: {simulation_id}'}), 404
+
+        # Only owner or admin may delete
+        if current_user.role != 'admin' and state.owner_user_id != current_user.user_id:
+            return jsonify({'success': False, 'error': 'Not authorised to delete this simulation'}), 403
+
+        # Stop if running
+        try:
+            run_state = SimulationRunner.get_run_state(simulation_id)
+            if run_state and run_state.runner_status.value == 'running':
+                SimulationRunner.stop_simulation(simulation_id)
+        except Exception:
+            pass
+
+        sim_dir = manager._get_simulation_dir(simulation_id)
+        if os.path.exists(sim_dir):
+            shutil.rmtree(sim_dir)
+
+        # Remove from in-memory cache
+        manager._simulations.pop(simulation_id, None)
+
+        logger.info(f"Simulation deleted: {simulation_id} by user {current_user.username}")
+        return jsonify({'success': True, 'data': {'simulation_id': simulation_id, 'deleted': True}})
+
+    except Exception as e:
+        logger.error(f"Failed to delete simulation: {str(e)}")
+        return jsonify({'success': False, 'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
+# ============== Archive endpoints (admin only) ==============
+
+@simulation_bp.route('/archive', methods=['GET'])
+@admin_required
+def get_archive():
+    """
+    Admin-only: list archived (legacy pre-auth) simulations.
+    """
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        manager = SimulationManager()
+        all_sims = manager.list_simulations()
+        archived = [s for s in all_sims if s.archived][:limit]
+
+        enriched = []
+        for sim in archived:
+            sim_dict = sim.to_dict()
+            config = manager.get_simulation_config(sim.simulation_id)
+            if config:
+                sim_dict['simulation_requirement'] = config.get('simulation_requirement', '')
+            else:
+                sim_dict['simulation_requirement'] = ''
+            run_state = SimulationRunner.get_run_state(sim.simulation_id)
+            if run_state:
+                sim_dict['current_round'] = run_state.current_round
+                sim_dict['runner_status'] = run_state.runner_status.value
+            sim_dict['report_id'] = _get_report_id_for_simulation(sim.simulation_id)
+            project = ProjectManager.get_project(sim.project_id)
+            if project and hasattr(project, 'files') and project.files:
+                sim_dict['files'] = [{'filename': f.get('filename', '')} for f in project.files[:3]]
+            else:
+                sim_dict['files'] = []
+            enriched.append(sim_dict)
+
+        return jsonify({'success': True, 'data': enriched, 'count': len(enriched)})
+
+    except Exception as e:
+        logger.error(f"Failed to get archive: {str(e)}")
+        return jsonify({'success': False, 'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
+@simulation_bp.route('/archive/<simulation_id>/restore', methods=['POST'])
+@admin_required
+def restore_from_archive(simulation_id: str):
+    """Admin un-archives a simulation."""
+    import json as _json
+    try:
+        manager = SimulationManager()
+        state = manager.get_simulation(simulation_id)
+        if not state:
+            return jsonify({'success': False, 'error': f'Simulation not found: {simulation_id}'}), 404
+        state.archived = False
+        manager._save_simulation_state(state)
+        return jsonify({'success': True, 'data': {'simulation_id': simulation_id, 'archived': False}})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

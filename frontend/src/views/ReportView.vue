@@ -3,7 +3,7 @@
     <!-- Header -->
     <header class="app-header">
       <div class="header-left">
-        <div class="brand" @click="router.push('/')">MIROFISH OFFLINE</div>
+        <div class="brand" @click="router.push('/')">MIROFISH × MU SIGMA</div>
       </div>
       
       <div class="header-center">
@@ -33,11 +33,14 @@
       </div>
     </header>
 
+    <!-- Research Question Banner -->
+    <QuestionBanner :projectData="projectData" />
+
     <!-- Main Content Area -->
     <main class="content-area">
       <!-- Left Panel: Graph -->
       <div class="panel-wrapper left" :style="leftPanelStyle">
-        <GraphPanel 
+        <GraphPanel
           :graphData="graphData"
           :loading="graphLoading"
           :currentPhase="4"
@@ -66,6 +69,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import GraphPanel from '../components/GraphPanel.vue'
 import Step4Report from '../components/Step4Report.vue'
+import QuestionBanner from '../components/QuestionBanner.vue'
 import { getProject, getGraphData } from '../api/graph'
 import { getSimulation } from '../api/simulation'
 import { getReport } from '../api/report'
@@ -217,7 +221,7 @@ onMounted(() => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #FFF;
+  background: var(--bg2);
   overflow: hidden;
   font-family: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
 }
@@ -225,12 +229,12 @@ onMounted(() => {
 /* Header */
 .app-header {
   height: 60px;
-  border-bottom: 1px solid #EAEAEA;
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  background: #FFF;
+  background: var(--bg2);
   z-index: 100;
   position: relative;
 }
@@ -251,7 +255,7 @@ onMounted(() => {
 
 .view-switcher {
   display: flex;
-  background: #F5F5F5;
+  background: var(--bg3);
   padding: 4px;
   border-radius: 6px;
   gap: 4px;
@@ -263,16 +267,16 @@ onMounted(() => {
   padding: 6px 16px;
   font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: var(--text2);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .switch-btn.active {
-  background: #FFF;
-  color: #000;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  background: var(--bg2);
+  color: var(--text);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
 .header-right {
@@ -291,12 +295,12 @@ onMounted(() => {
 .step-num {
   font-family: 'JetBrains Mono', monospace;
   font-weight: 700;
-  color: #999;
+  color: var(--text3);
 }
 
 .step-name {
   font-weight: 700;
-  color: #000;
+  color: var(--text);
 }
 
 .step-divider {
@@ -310,7 +314,7 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #666;
+  color: var(--text2);
   font-weight: 500;
 }
 

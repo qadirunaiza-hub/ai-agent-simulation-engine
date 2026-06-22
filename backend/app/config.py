@@ -4,6 +4,7 @@ Loads configuration from .env file in project root directory
 """
 
 import os
+from typing import Optional
 from dotenv import load_dotenv
 
 # Load .env file from project root
@@ -44,7 +45,7 @@ class Config:
     # File upload configuration
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB
     UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), '../uploads')
-    ALLOWED_EXTENSIONS = {'pdf', 'md', 'txt', 'markdown'}
+    ALLOWED_EXTENSIONS = {'pdf', 'md', 'txt', 'markdown', 'json'}
 
     # Text processing configuration
     DEFAULT_CHUNK_SIZE = 500  # Default chunk size
@@ -68,6 +69,26 @@ class Config:
     REPORT_AGENT_MAX_TOOL_CALLS = int(os.environ.get('REPORT_AGENT_MAX_TOOL_CALLS', '5'))
     REPORT_AGENT_MAX_REFLECTION_ROUNDS = int(os.environ.get('REPORT_AGENT_MAX_REFLECTION_ROUNDS', '2'))
     REPORT_AGENT_TEMPERATURE = float(os.environ.get('REPORT_AGENT_TEMPERATURE', '0.5'))
+
+    # Runtime overrides (set via /api/settings at runtime, override .env)
+    _runtime_model: Optional[str] = None
+    _runtime_base_url: Optional[str] = None
+
+    @classmethod
+    def get_runtime_model(cls) -> Optional[str]:
+        return cls._runtime_model
+
+    @classmethod
+    def set_runtime_model(cls, model: str):
+        cls._runtime_model = model
+
+    @classmethod
+    def get_active_base_url(cls) -> str:
+        return cls._runtime_base_url or cls.LLM_BASE_URL
+
+    @classmethod
+    def set_runtime_base_url(cls, url: str):
+        cls._runtime_base_url = url.rstrip('/')
 
     @classmethod
     def validate(cls):

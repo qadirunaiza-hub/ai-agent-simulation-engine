@@ -3,7 +3,7 @@
     <!-- Header -->
     <header class="app-header">
       <div class="header-left">
-        <div class="brand" @click="router.push('/')">MIROFISH OFFLINE</div>
+        <div class="brand" @click="router.push('/')">MIROFISH × MU SIGMA</div>
       </div>
       
       <div class="header-center">
@@ -21,6 +21,8 @@
       </div>
 
       <div class="header-right">
+        <ModelChooser />
+        <div class="step-divider"></div>
         <div class="workflow-step">
           <span class="step-num">Step {{ currentStep }}/5</span>
           <span class="step-name">{{ stepNames[currentStep - 1] }}</span>
@@ -33,11 +35,14 @@
       </div>
     </header>
 
+    <!-- Research Question Banner -->
+    <QuestionBanner :projectData="projectData" />
+
     <!-- Main Content Area -->
     <main class="content-area">
       <!-- Left Panel: Graph -->
       <div class="panel-wrapper left" :style="leftPanelStyle">
-        <GraphPanel 
+        <GraphPanel
           :graphData="graphData"
           :loading="graphLoading"
           :currentPhase="currentPhase"
@@ -76,10 +81,12 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import QuestionBanner from '../components/QuestionBanner.vue'
 import { useRoute, useRouter } from 'vue-router'
 import GraphPanel from '../components/GraphPanel.vue'
 import Step1GraphBuild from '../components/Step1GraphBuild.vue'
 import Step2EnvSetup from '../components/Step2EnvSetup.vue'
+import ModelChooser from '../components/ModelChooser.vue'
 import { generateOntology, getProject, buildGraph, getTaskStatus, getGraphData } from '../api/graph'
 import { getPendingUpload, clearPendingUpload } from '../store/pendingUpload'
 
@@ -189,8 +196,8 @@ const initProject = async () => {
 const handleNewProject = async () => {
   const pending = getPendingUpload()
   if (!pending.isPending || pending.files.length === 0) {
-    error.value = 'No pending files found.'
-    addLog('Error: No pending files found for new project.')
+    addLog('No pending upload found, redirecting to home.')
+    router.replace('/')
     return
   }
   
@@ -409,7 +416,7 @@ onUnmounted(() => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #FFF;
+  background: var(--bg2);
   overflow: hidden;
   font-family: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
 }
@@ -417,12 +424,12 @@ onUnmounted(() => {
 /* Header */
 .app-header {
   height: 60px;
-  border-bottom: 1px solid #EAEAEA;
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  background: #FFF;
+  background: var(--bg2);
   z-index: 100;
   position: relative;
 }
@@ -443,7 +450,7 @@ onUnmounted(() => {
 
 .view-switcher {
   display: flex;
-  background: #F5F5F5;
+  background: var(--bg3);
   padding: 4px;
   border-radius: 6px;
   gap: 4px;
@@ -455,16 +462,16 @@ onUnmounted(() => {
   padding: 6px 16px;
   font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: var(--text2);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .switch-btn.active {
-  background: #FFF;
-  color: #000;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  background: var(--bg2);
+  color: var(--text);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
 .status-indicator {
@@ -472,7 +479,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #666;
+  color: var(--text2);
   font-weight: 500;
 }
 
@@ -492,12 +499,12 @@ onUnmounted(() => {
 .step-num {
   font-family: 'JetBrains Mono', monospace;
   font-weight: 700;
-  color: #999;
+  color: var(--text3);
 }
 
 .step-name {
   font-weight: 700;
-  color: #000;
+  color: var(--text);
 }
 
 .step-divider {

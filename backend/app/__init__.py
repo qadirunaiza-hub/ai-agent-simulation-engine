@@ -76,9 +76,27 @@ def create_app(config_class=Config):
 
     # Register blueprints
     from .api import graph_bp, simulation_bp, report_bp
+    from .api.settings import settings_bp
+    from .api.scraper import scraper_bp
+    from .api.auth import auth_bp
     app.register_blueprint(graph_bp, url_prefix='/api/graph')
     app.register_blueprint(simulation_bp, url_prefix='/api/simulation')
     app.register_blueprint(report_bp, url_prefix='/api/report')
+    app.register_blueprint(settings_bp, url_prefix='/api/settings')
+    app.register_blueprint(scraper_bp, url_prefix='/api/scrape')
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+
+    # Seed default admin user
+    from .models.user import UserManager
+    try:
+        UserManager.seed_admin()
+        if should_log_startup:
+            logger.info("Admin user seeded (username: admin)")
+    except Exception as e:
+        logger.error("Failed to seed admin user: %s", e)
+
+    # Archive legacy simulations (those created before auth was added)
+    _archive_legacy_simulations(logger)
 
     # Health check
     @app.route('/health')
@@ -89,4 +107,33 @@ def create_app(config_class=Config):
         logger.info("MiroFish-Offline Backend startup complete")
 
     return app
+
+
+def _archive_legacy_simulations(logger):
+    """Mark pre-auth simulations as archived so only admin can see them."""
+    import json
+    import os
+    from .config import Config
+
+    sims_dir = Config.OASIS_SIMULATION_DATA_DIR
+    if not os.path.exists(sims_dir):
+        return
+    archived_count = 0
+    for sim_id in os.listdir(sims_dir):
+        state_file = os.path.join(sims_dir, sim_id, 'state.json')
+        if not os.path.isfile(state_file):
+            continue
+        try:
+            with open(state_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if 'owner_user_id' not in data:
+                data['owner_user_id'] = None
+                data['archived'] = True
+                with open(state_file, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                archived_count += 1
+        except Exception:
+            pass
+    if archived_count:
+        logger.info("Archived %d legacy simulation(s) (pre-auth)", archived_count)
 

@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>MiroFish-Offline — Engineering Change Report</title>
+<style>
+:root{
+  --navy:#0D1B2A; --blue:#1565C0; --teal:#00897B; --red:#C62828;
+  --amber:#FF8F00; --lgrey:#F5F5F5; --mgrey:#E0E0E0; --dgrey:#757575;
+  --add-bg:#E8F5E9; --add-fg:#1B5E20;
+  --del-bg:#FFEBEE; --del-fg:#B71C1C;
+  --mod-bg:#FFF8E1; --mod-fg:#E65100;
+  --new-bg:#E3F2FD; --new-fg:#0D47A1;
+  --white:#fff; --black:#111;
+  --body-font:'Segoe UI',system-ui,sans-serif;
+  --code-font:'Cascadia Code','Fira Code','Courier New',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body-font);font-size:13px;color:var(--black);background:#fff;line-height:1.55}
+a{color:var(--blue)}
+
+/* ── page wrapper ── */
+.page{max-width:980px;margin:0 auto;padding:32px 28px 64px}
+
+/* ── cover ── */
+.cover{background:var(--navy);color:#fff;border-radius:10px;padding:52px 44px 44px;margin-bottom:36px;position:relative;overflow:hidden}
+.cover::after{content:'';position:absolute;right:-60px;bottom:-60px;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.03)}
+.cover-logo{font-size:10px;letter-spacing:4px;color:#90A4AE;margin-bottom:24px;text-transform:uppercase}
+.cover h1{font-size:34px;font-weight:700;letter-spacing:-.5px;margin-bottom:6px}
+.cover h2{font-size:18px;font-weight:400;color:#B0BEC5;margin-bottom:32px}
+.cover-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;border-top:1px solid rgba(255,255,255,.1);padding-top:24px;margin-top:8px}
+.cover-meta-item label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#546E7A;display:block;margin-bottom:4px}
+.cover-meta-item span{font-size:12px;color:#CFD8DC;font-weight:500}
+.cover-tag{display:inline-block;background:rgba(21,101,192,.5);border:1px solid rgba(21,101,192,.8);color:#90CAF9;font-size:9px;letter-spacing:2px;padding:3px 10px;border-radius:4px;text-transform:uppercase;margin-bottom:20px}
+
+/* ── toc ── */
+.toc{background:var(--lgrey);border-left:4px solid var(--blue);border-radius:0 6px 6px 0;padding:18px 22px;margin-bottom:32px}
+.toc h3{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--dgrey);margin-bottom:12px}
+.toc ol{padding-left:20px}
+.toc li{margin-bottom:5px;font-size:12px}
+.toc a{color:var(--blue);text-decoration:none}
+.toc a:hover{text-decoration:underline}
+
+/* ── section headings ── */
+.section{margin-bottom:40px}
+.section-header{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.section-num{width:28px;height:28px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+h2.sec{font-size:18px;font-weight:700;color:var(--navy)}
+.sec-rule{border:none;border-top:2px solid var(--blue);margin:6px 0 18px}
+h3.sub{font-size:13px;font-weight:700;color:var(--blue);margin:18px 0 8px;padding-left:4px;border-left:3px solid var(--teal)}
+h4.sub2{font-size:12px;font-weight:700;color:var(--teal);margin:14px 0 6px}
+
+/* ── phase banner ── */
+.phase{border-radius:8px;padding:14px 18px;margin-bottom:24px;display:flex;align-items:flex-start;gap:16px}
+.phase-date{font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:700;white-space:nowrap;margin-top:2px}
+.phase-body h3{font-size:14px;font-weight:700;margin-bottom:4px}
+.phase-body p{font-size:12px;color:#444;line-height:1.5}
+.ph1{background:#E8F5E9;border-left:4px solid var(--teal)}
+.ph1 .phase-date{color:var(--teal)}
+.ph2{background:#E3F2FD;border-left:4px solid var(--blue)}
+.ph2 .phase-date{color:var(--blue)}
+.ph3{background:#FFF8E1;border-left:4px solid var(--amber)}
+.ph3 .phase-date{color:var(--amber)}
+
+/* ── summary table ── */
+table.summary,table.ep,table.cmp{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:18px}
+table.summary thead,table.ep thead,table.cmp thead{background:var(--navy);color:#fff}
+table.summary th,table.ep th,table.cmp th{padding:9px 12px;text-align:left;font-size:10px;letter-spacing:1px;text-transform:uppercase;font-weight:600}
+table.summary td,table.ep td,table.cmp td{padding:8px 12px;vertical-align:top;border-bottom:1px solid var(--mgrey)}
+table.summary tr:nth-child(even),table.ep tr:nth-child(even),table.cmp tr:nth-child(even){background:var(--lgrey)}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+.badge-new{background:var(--new-bg);color:var(--new-fg)}
+.badge-mod{background:var(--mod-bg);color:var(--mod-fg)}
+.badge-del{background:var(--del-bg);color:var(--del-fg)}
+td code,th code{font-family:var(--code-font);font-size:10.5px;background:#f0f0f0;padding:1px 5px;border-radius:3px}
+
+/* ── diff table ── */
+.diff{width:100%;border-collapse:collapse;font-family:var(--code-font);font-size:10.5px;margin:10px 0 16px;border:1px solid var(--mgrey);border-radius:6px;overflow:hidden}
+.diff td{padding:5px 10px;vertical-align:top;border-bottom:1px solid #eee;line-height:1.45}
+.diff td:first-child{width:24px;text-align:center;font-weight:700;font-size:12px;border-right:1px solid #eee}
+.diff tr.add{background:var(--add-bg)}
+.diff tr.add td:first-child{color:var(--add-fg)}
+.diff tr.del{background:var(--del-bg)}
+.diff tr.del td:first-child{color:var(--del-fg)}
+.diff tr.mod{background:var(--mod-bg)}
+.diff tr.mod td:first-child{color:var(--mod-fg)}
+.diff tr.new{background:var(--new-bg)}
+.diff tr.new td:first-child{color:var(--new-fg)}
+.diff .before{color:var(--del-fg)}
+.diff .after{color:var(--add-fg)}
+
+/* ── endpoint table ── */
+table.ep td:first-child{font-weight:700;font-size:10px;letter-spacing:.5px;white-space:nowrap;width:56px}
+.method-get{color:#1565C0}
+.method-post{color:#2E7D32}
+.method-put{color:#E65100}
+.method-delete{color:#C62828}
+.method-patch{color:#6A1B9A}
+
+/* ── code block ── */
+pre.code{background:#0D1B2A;color:#A5D6A7;font-family:var(--code-font);font-size:10.5px;padding:16px 18px;border-radius:6px;overflow-x:auto;margin:10px 0 16px;line-height:1.6}
+pre.code .c{color:#546E7A}
+pre.code .k{color:#80CBC4}
+pre.code .s{color:#FFCC80}
+
+/* ── comparison table ── */
+.cmp td:first-child{font-weight:600;font-size:11px;background:var(--lgrey);width:200px}
+.tick{color:var(--teal);font-weight:700}
+.cross{color:var(--red);font-weight:700}
+.neutral{color:var(--dgrey)}
+
+/* ── arch diagram ── */
+.arch{background:#0D1B2A;color:#A5D6A7;font-family:var(--code-font);font-size:11px;padding:20px 24px;border-radius:8px;margin:10px 0 16px;line-height:1.8;overflow-x:auto}
+
+/* ── callout ── */
+.callout{border-radius:6px;padding:12px 16px;margin:12px 0;font-size:12px;line-height:1.55}
+.callout-teal{background:#E0F2F1;border-left:4px solid var(--teal)}
+.callout-blue{background:#E3F2FD;border-left:4px solid var(--blue)}
+.callout-amber{background:#FFF8E1;border-left:4px solid var(--amber)}
+.callout-red{background:#FFEBEE;border-left:4px solid var(--red)}
+.callout strong{display:block;margin-bottom:4px;font-size:11px;letter-spacing:.5px;text-transform:uppercase}
+
+/* ── footer ── */
+footer{border-top:2px solid var(--navy);padding-top:14px;margin-top:40px;display:flex;justify-content:space-between;font-size:10px;color:var(--dgrey)}
+footer span:last-child{text-align:right}
+
+/* ── print ── */
+@media print{.page{padding:0}.cover{border-radius:0}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ═══════════════════════════════════════════════════════════
+     COVER
+════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-logo">Mu-Sigma · Decision Sciences</div>
+  <div class="cover-tag">Internal Engineering Document</div>
+  <h1>MiroFish-Offline</h1>
+  <h2>Engineering Change Report — Sprint Cycle v1.0 to v2.0</h2>
+  <div class="cover-meta">
+    <div class="cover-meta-item"><label>Report Period</label><span>15 Jun – 20 Jun 2026</span></div>
+    <div class="cover-meta-item"><label>Prepared By</label><span>Hariharan M · hariharan.m@mu-sigma.com</span></div>
+    <div class="cover-meta-item"><label>Classification</label><span>Internal Use Only</span></div>
+    <div class="cover-meta-item"><label>Phases Covered</label><span>3 delivery phases</span></div>
+    <div class="cover-meta-item"><label>Files Changed</label><span>32 modified · 21 new</span></div>
+    <div class="cover-meta-item"><label>Stack</label><span>Flask · Vue 3 · Neo4j · Ollama</span></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TABLE OF CONTENTS
+════════════════════════════════════════════════════════════ -->
+<div class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#s1">Executive Summary</a></li>
+    <li><a href="#s2">Change Timeline &amp; Phase Overview</a></li>
+    <li><a href="#s3">Master File Change Index</a></li>
+    <li><a href="#s4">Phase 1 — Infrastructure &amp; LLM Control (15 Jun 2026)</a></li>
+    <li><a href="#s5">Phase 2 — Authentication, Branding &amp; Intelligence Feed (17 Jun 2026)</a></li>
+    <li><a href="#s6">Phase 3 — Simulation Enhancement &amp; UI Polish (20 Jun 2026)</a></li>
+    <li><a href="#s7">Architecture Overview</a></li>
+    <li><a href="#s8">How to Run</a></li>
+    <li><a href="#s9">Appendix — Pydantic NER Upgrade Plan</a></li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     1. EXECUTIVE SUMMARY
+════════════════════════════════════════════════════════════ -->
+<div class="section" id="s1">
+  <div class="section-header"><div class="section-num">1</div><h2 class="sec">Executive Summary</h2></div>
+  <hr class="sec-rule"/>
+  <p style="font-size:13px;line-height:1.7;margin-bottom:12px">
+    MiroFish-Offline is a multi-agent social simulation engine built on the OASIS / CAMEL-AI
+    framework with a Neo4j knowledge graph backend and a Vue 3 frontend. The baseline repository
+    (forked from nikmcfly/MiroFish-Offline) ran with a local Ollama container and offered no runtime
+    model control, no auth, no LLM call visibility, no live news enrichment, and no way to pause or
+    reorder agents mid-simulation.
+  </p>
+  <p style="font-size:13px;line-height:1.7;margin-bottom:16px">
+    This report documents every change made across a three-phase sprint (15–20 June 2026) that
+    transformed the project into a production-grade, multi-user, remotely accessible simulation
+    platform under the <strong>Mu-Sigma</strong> brand.
+  </p>
+  <div class="callout callout-teal">
+    <strong>Capabilities Delivered</strong>
+    • <b>Token-based multi-user authentication</b> with role-based access (admin / user), login/register UI, and 1-week session tokens.<br/>
+    • <b>Runtime LLM model switcher</b> — pick any of 59 models from the remote Ollama server without restarting the app.<br/>
+    • <b>Transparent agentic conversation log</b> — every LLM prompt and response captured in a live, draggable floating panel.<br/>
+    • <b>Live intelligence feed</b> — web scraper pulls current headlines from HackerNews, BBC, Reuters, Reddit to seed simulations.<br/>
+    • <b>Pause, rearrange &amp; inject</b> — pause a running simulation, reorder agents, tweak sliders, inject events, then resume.<br/>
+    • <b>Bag ontology panel</b> — entity types and edge types from Neo4j surfaced live in the simulation UI.<br/>
+    • <b>Dark / light theme</b> with persistent preference and Mu-Sigma branding throughout.<br/>
+    • <b>Network portability fix</b> — relative API paths so the app works from any IP/hostname.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     2. CHANGE TIMELINE
+════════════════════════════════════════════════════════════ -->
+<div class="section" id="s2">
+  <div class="section-header"><div class="section-num">2</div><h2 class="sec">Change Timeline &amp; Phase Overview</h2></div>
+  <hr class="sec-rule"/>
+
+  <div class="phase ph1">
+    <div class="phase-date">15 Jun 2026</div>
+    <div class="phase-body">
+      <h3>Phase 1 — Infrastructure &amp; LLM Control</h3>
+      <p>Removed local Ollama dependency; wired remote server (172.25.1.70:11434). Added runtime model/server switching API and Model Chooser UI. Implemented global LLM call logging. Fixed network portability (relative API base URL + Vite proxy port 5010). Registered all new blueprints.</p>
+    </div>
+  </div>
+
+  <div class="phase ph2">
+    <div class="phase-date">17 Jun 2026</div>
+    <div class="phase-body">
+      <h3>Phase 2 — Authentication, Branding &amp; Intelligence Feed</h3>
+      <p>Full token-based auth system: User model (file-backed JSON), auth_utils (UUID token store, decorators), Auth API (login / register / logout / me / model-request management), frontend Login + Splash views, auth store, theme toggle store. Mu-Sigma brand assets added (logos, NeonFish animated SVG). Live scraper API pulling HackerNews, BBC RSS, Reuters RSS, Reddit WorldNews. ScrapeBanner and QuestionBanner UI components. Router auth guard added.</p>
+    </div>
+  </div>
+
+  <div class="phase ph3">
+    <div class="phase-date">20 Jun 2026</div>
+    <div class="phase-body">
+      <h3>Phase 3 — Simulation Enhancement &amp; UI Polish</h3>
+      <p>Six new simulation API endpoints (pause / resume / agent-reorder / inject-event / ontology / per-sim LLM log). Simulation manager enhanced with pause/resume control. Ontology generator hardened (Person + Organization universal fallbacks, 6–10 type caps). LlmPopup draggable floating panel. Step3Simulation major overhaul (ontology panel, LLM log panel, pause/resume overlay). Full UI refresh across all views and steps with Mu-Sigma theming.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     3. MASTER FILE CHANGE INDEX
+════════════════════════════════════════════════════════════ -->
+<div class="section" id="s3">
+  <div class="section-header"><div class="section-num">3</div><h2 class="sec">Master File Change Index</h2></div>
+  <hr class="sec-rule"/>
+
+  <h3 class="sub">Backend</h3>
+  <table class="summary">
+    <thead><tr><th>File</th><th>Status</th><th>Phase</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>backend/app/__init__.py</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 1</td><td>Registered settings_bp, auth_bp, scraper_bp blueprints</td></tr>
+      <tr><td><code>backend/app/api/__init__.py</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 1</td><td>Blueprint exports updated</td></tr>
+      <tr><td><code>backend/app/config.py</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 1</td><td>Runtime model &amp; base_url override slots + getters/setters</td></tr>
+      <tr><td><code>backend/app/utils/llm_client.py</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 1</td><td>Global ring-buffer call log (200 entries), per-sim JSONL file, runtime URL/model resolution</td></tr>
+      <tr><td><code>backend/app/api/settings.py</code></td><td><span class="badge badge-new">New</span></td><td>Ph 1</td><td>7 endpoints for runtime LLM control and call-log retrieval</td></tr>
+      <tr><td><code>backend/app/api/auth.py</code></td><td><span class="badge badge-new">New</span></td><td>Ph 2</td><td>Login, register, logout, /me, model-request management (6 endpoints)</td></tr>
+      <tr><td><code>backend/app/models/user.py</code></td><td><span class="badge badge-new">New</span></td><td>Ph 2</td><td>User dataclass, file-backed JSON store, admin seed on first run</td></tr>
+      <tr><td><code>backend/app/utils/auth_utils.py</code></td><td><span class="badge badge-new">New</span></td><td>Ph 2</td><td>UUID token store (7-day TTL), login_required / admin_required decorators</td></tr>
+      <tr><td><code>backend/app/api/scraper.py</code></td><td><span class="badge badge-new">New</span></td><td>Ph 2</td><td>Live news scraper: HackerNews, BBC RSS, Reuters RSS, Reddit WorldNews; in-memory cache</td></tr>
+      <tr><td><code>backend/app/api/simulation.py</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>6 new endpoints: pause, resume, agent-reorder, inject-event, ontology, per-sim LLM log</td></tr>
+      <tr><td><code>backend/app/services/simulation_manager.py</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Pause/resume state machine, subprocess signal handling</td></tr>
+      <tr><td><code>backend/app/services/graph_builder.py</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Chunk-level logging, batch progress callbacks</td></tr>
+      <tr><td><code>backend/app/services/ontology_generator.py</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Universal Person + Organization fallbacks, 6–10 type cap enforcement, description truncation</td></tr>
+      <tr><td><code>backend/app/utils/file_parser.py</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Encoding detection improvements (charset-normalizer)</td></tr>
+      <tr><td><code>docker-compose.yml</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 1</td><td>Removed local ollama service; all LLM traffic goes to remote server</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">Frontend — New Files</h3>
+  <table class="summary">
+    <thead><tr><th>File</th><th>Status</th><th>Phase</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>frontend/src/api/auth.js</code></td><td><span class="badge badge-new">New</span></td><td>Ph 2</td><td>Axios wrappers for all auth endpoints</td></tr>
+      <tr><td><code>frontend/src/api/settings.js</code></td><td><span class="badge badge-new">New</span></td><td>Ph 1</td><td>Axios wrappers for all settings endpoints</td></tr>
+      <tr><td><code>frontend/src/store/auth.js</code></td><td><span class="badge badge-new">New</span></td><td>Ph 2</td><td>Reactive auth state (currentUser, isLoggedIn, isAdmin), localStorage persistence</td></tr>
+      <tr><td><code>frontend/src/store/theme.js</code></td><td><span class="badge badge-new">New</span></td><td>Ph 2</td><td>Dark/light theme reactive store with localStorage persistence</td></tr>
+      <tr><td><code>frontend/src/views/LoginView.vue</code></td><td><span class="badge badge-new">New</span></td><td>Ph 2</td><td>Login + register page with fish SVG logo, theme toggle, Mu-Sigma brand tagline</td></tr>
+      <tr><td><code>frontend/src/views/SplashView.vue</code></td><td><span class="badge badge-new">New</span></td><td>Ph 2</td><td>Post-login splash / welcome screen with animated fish and session context</td></tr>
+      <tr><td><code>frontend/src/components/ModelChooser.vue</code></td><td><span class="badge badge-new">New</span></td><td>Ph 1</td><td>Header dropdown: live model list, server URL input, health dot, custom model field</td></tr>
+      <tr><td><code>frontend/src/components/LlmPopup.vue</code></td><td><span class="badge badge-new">New</span></td><td>Ph 3</td><td>Draggable floating panel showing live agentic conversation (prompts + responses, expandable)</td></tr>
+      <tr><td><code>frontend/src/components/NeonFish.vue</code></td><td><span class="badge badge-new">New</span></td><td>Ph 2</td><td>Animated SVG fish with glow filters and rising bubble particles (brand mascot component)</td></tr>
+      <tr><td><code>frontend/src/components/QuestionBanner.vue</code></td><td><span class="badge badge-new">New</span></td><td>Ph 2</td><td>Collapsible OBJECTIVE banner showing simulation question and source document chips</td></tr>
+      <tr><td><code>frontend/src/components/ScrapeBanner.vue</code></td><td><span class="badge badge-new">New</span></td><td>Ph 2</td><td>INFORMATION BASIS ticker: scrape timestamp, article count, source list, scrolling headlines</td></tr>
+      <tr><td><code>frontend/public/mirofish-banner.png</code></td><td><span class="badge badge-new">New</span></td><td>Ph 2</td><td>Brand banner asset</td></tr>
+      <tr><td><code>frontend/public/mirofish-logo.png</code></td><td><span class="badge badge-new">New</span></td><td>Ph 2</td><td>MiroFish product logo</td></tr>
+      <tr><td><code>frontend/public/musigma-logo.png</code></td><td><span class="badge badge-new">New</span></td><td>Ph 2</td><td>Mu-Sigma corporate logo</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">Frontend — Modified Files</h3>
+  <table class="summary">
+    <thead><tr><th>File</th><th>Status</th><th>Phase</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>frontend/src/api/index.js</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 1</td><td>baseURL set to '' (relative) — network portability fix</td></tr>
+      <tr><td><code>frontend/src/api/graph.js</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Auth header injection, updated endpoint references</td></tr>
+      <tr><td><code>frontend/src/api/report.js</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Auth header injection</td></tr>
+      <tr><td><code>frontend/src/api/simulation.js</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Auth header injection, new pause/resume/inject/ontology/LLM-log call wrappers</td></tr>
+      <tr><td><code>frontend/src/main.js</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 2</td><td>Auth store + theme store initialised on app boot</td></tr>
+      <tr><td><code>frontend/src/router/index.js</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 2</td><td>Navigation guard: unauthenticated users redirected to /login</td></tr>
+      <tr><td><code>frontend/src/App.vue</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 2</td><td>Theme data-attribute binding at root level</td></tr>
+      <tr><td><code>frontend/src/views/MainView.vue</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 1+3</td><td>ModelChooser added to header; user info + logout in nav</td></tr>
+      <tr><td><code>frontend/src/views/Home.vue</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Mu-Sigma branding, NeonFish mascot, ScrapeBanner integration</td></tr>
+      <tr><td><code>frontend/src/views/InteractionView.vue</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Theme support, QuestionBanner, auth header on API calls</td></tr>
+      <tr><td><code>frontend/src/views/ReportView.vue</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Theme support, improved report layout</td></tr>
+      <tr><td><code>frontend/src/views/SimulationRunView.vue</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>LlmPopup integrated, QuestionBanner</td></tr>
+      <tr><td><code>frontend/src/views/SimulationView.vue</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Theme support, improved simulation status display</td></tr>
+      <tr><td><code>frontend/src/components/Step1GraphBuild.vue</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Theming, ScrapeBanner enrichment hint</td></tr>
+      <tr><td><code>frontend/src/components/Step2EnvSetup.vue</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Theming, QuestionBanner for objective display</td></tr>
+      <tr><td><code>frontend/src/components/Step3Simulation.vue</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Pause/resume overlay, ontology panel, LLM log panel (major overhaul)</td></tr>
+      <tr><td><code>frontend/src/components/Step5Interaction.vue</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Theming, LlmPopup toggle button</td></tr>
+      <tr><td><code>frontend/src/components/GraphPanel.vue</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Theme-aware colours, improved node label rendering</td></tr>
+      <tr><td><code>frontend/src/components/HistoryDatabase.vue</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Theme support, improved run history display</td></tr>
+      <tr><td><code>frontend/vite.config.js</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 1</td><td>Proxy target port 5001 → 5010</td></tr>
+      <tr><td><code>frontend/public/home-styles.css</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>CSS variables for dark/light theme, Mu-Sigma brand palette</td></tr>
+      <tr><td><code>frontend/src/views/Home.css</code></td><td><span class="badge badge-mod">Modified</span></td><td>Ph 3</td><td>Home page responsive layout, NeonFish scene styling</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     4. PHASE 1 — INFRASTRUCTURE & LLM CONTROL (15 JUN 2026)
+════════════════════════════════════════════════════════════ -->
+<div class="section" id="s4">
+  <div class="section-header"><div class="section-num">4</div><h2 class="sec">Phase 1 — Infrastructure &amp; LLM Control <span style="font-size:13px;font-weight:400;color:var(--teal)">15 Jun 2026</span></h2></div>
+  <hr class="sec-rule"/>
+
+  <h3 class="sub">4.1 docker-compose.yml — Local Ollama Removed</h3>
+  <p style="margin-bottom:8px;font-size:12px">The <code>ollama</code> service and its <code>volumes</code> + <code>depends_on</code> references were stripped. All LLM traffic now routes to the remote server at <code>172.25.1.70:11434</code>.</p>
+  <table class="diff">
+    <tr class="del"><td>−</td><td class="before">ollama:</td><td></td></tr>
+    <tr class="del"><td>−</td><td class="before">  image: ollama/ollama</td><td></td></tr>
+    <tr class="del"><td>−</td><td class="before">  volumes: [ollama_data:/root/.ollama]</td><td></td></tr>
+    <tr class="del"><td>−</td><td class="before">  depends_on: [ollama]  # in mirofish service</td><td></td></tr>
+    <tr class="mod"><td>~</td><td class="before">FLASK_PORT=5001</td><td class="after">FLASK_PORT=5010  # avoids OS collision</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">LLM_BASE_URL=http://172.25.1.70:11434/v1</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">LLM_MODEL_NAME=qwen2.5:32b</td></tr>
+  </table>
+
+  <h3 class="sub">4.2 backend/app/config.py — Runtime Override Slots</h3>
+  <p style="margin-bottom:8px;font-size:12px">Class-level mutable slots let the settings API hot-swap model and server URL without a process restart. All LLM calls read via getters that prefer the runtime value.</p>
+  <table class="diff">
+    <tr class="add"><td>+</td><td></td><td class="after">_runtime_model: Optional[str] = None</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">_runtime_base_url: Optional[str] = None</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">get_runtime_model() / set_runtime_model(model: str)</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">get_active_base_url() → _runtime_base_url or LLM_BASE_URL</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">set_runtime_base_url(url: str)</td></tr>
+  </table>
+
+  <h3 class="sub">4.3 backend/app/utils/llm_client.py — Transparency Logging</h3>
+  <p style="margin-bottom:8px;font-size:12px">Three additions: runtime config resolution, global in-memory ring buffer (200 entries), and per-simulation JSONL file writer.</p>
+  <table class="diff">
+    <tr class="mod"><td>~</td><td class="before">base_url = base_url or Config.LLM_BASE_URL</td><td class="after">base_url = base_url or Config.get_active_base_url()</td></tr>
+    <tr class="mod"><td>~</td><td class="before">model = model or Config.LLM_MODEL_NAME</td><td class="after">model = model or Config.get_runtime_model() or Config.LLM_MODEL_NAME</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">_global_llm_log: deque = deque(maxlen=200)</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">get_global_llm_log() → List[Dict]  (newest-first)</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">__init__ params: call_tag, simulation_log_path</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">_log_call() → appends to deque + writes JSONL line</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">chat() calls self._log_call() after every completion</td></tr>
+  </table>
+
+  <h3 class="sub">4.4 backend/app/api/settings.py — NEW: LLM Settings API</h3>
+  <p style="margin-bottom:8px;font-size:12px">New Flask blueprint registered at <code>/api/settings</code>. Provides complete runtime control over LLM configuration and exposes the transparency log.</p>
+  <table class="ep">
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td class="method-get">GET</td><td><code>/api/settings</code></td><td>Current model, base_url, override flags</td></tr>
+      <tr><td class="method-get">GET</td><td><code>/api/settings/models</code></td><td>Live model list from Ollama <code>/api/tags</code>; optional <code>?url=</code> to probe a different server</td></tr>
+      <tr><td class="method-post">POST</td><td><code>/api/settings/model</code></td><td>Switch active model at runtime. Body: <code>{model}</code></td></tr>
+      <tr><td class="method-delete">DELETE</td><td><code>/api/settings/model</code></td><td>Reset to <code>.env</code> default model</td></tr>
+      <tr><td class="method-post">POST</td><td><code>/api/settings/server</code></td><td>Switch Ollama server URL; probes server and returns live model list</td></tr>
+      <tr><td class="method-delete">DELETE</td><td><code>/api/settings/server</code></td><td>Revert server URL to <code>.env</code> default</td></tr>
+      <tr><td class="method-get">GET</td><td><code>/api/settings/llm-calls</code></td><td>Global LLM transparency log; <code>?limit=N&amp;tag=X</code> filters</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">4.5 frontend/src/components/ModelChooser.vue — NEW</h3>
+  <p style="margin-bottom:8px;font-size:12px">Compact dropdown button in the app header. Shows active model name and a green/red health dot. Clicking opens a popover with server URL input, live model list, and a custom model name field.</p>
+  <div class="callout callout-blue">
+    <strong>Interactions</strong>
+    • <b>Connect</b> button → <code>POST /api/settings/server</code>; probes server; loads 59 model names.<br/>
+    • Clicking a model → <code>POST /api/settings/model</code>; header label updates immediately.<br/>
+    • Health dot polls <code>GET /api/settings</code> every 30 s.
+  </div>
+
+  <h3 class="sub">4.6 frontend/src/api/index.js — Network Portability Fix</h3>
+  <table class="diff">
+    <tr class="mod"><td>~</td><td class="before">baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001'</td><td class="after">baseURL: ''  // relative — Vite proxy intercepts /api/*</td></tr>
+  </table>
+  <div class="callout callout-amber">
+    <strong>Why this matters</strong>
+    Hard-coding localhost:5001 means any user opening the app from another machine (e.g. 172.25.2.181:3010) gets CORS failures — the browser tries to reach localhost on the user's own machine. Switching to a relative base URL lets Vite's dev-server proxy forward all <code>/api/*</code> traffic to the backend server-side.
+  </div>
+
+  <h3 class="sub">4.7 frontend/vite.config.js</h3>
+  <table class="diff">
+    <tr class="mod"><td>~</td><td class="before">target: 'http://localhost:5001'</td><td class="after">target: 'http://localhost:5010'</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     5. PHASE 2 — AUTH, BRANDING & INTEL FEED (17 JUN 2026)
+════════════════════════════════════════════════════════════ -->
+<div class="section" id="s5">
+  <div class="section-header"><div class="section-num">5</div><h2 class="sec">Phase 2 — Authentication, Branding &amp; Intelligence Feed <span style="font-size:13px;font-weight:400;color:var(--blue)">17 Jun 2026</span></h2></div>
+  <hr class="sec-rule"/>
+
+  <h3 class="sub">5.1 backend/app/models/user.py — NEW: User Model</h3>
+  <p style="margin-bottom:8px;font-size:12px">File-backed JSON user store at <code>backend/uploads/users.json</code>. Admin seeded automatically on first run with <code>admin / admin@123</code>.</p>
+  <table class="diff">
+    <tr class="new"><td>*</td><td></td><td class="after">User dataclass: user_id, username, email, password_hash, role, created_at, is_active</td></tr>
+    <tr class="new"><td>*</td><td></td><td class="after">check_password() → werkzeug.security.check_password_hash</td></tr>
+    <tr class="new"><td>*</td><td></td><td class="after">UserManager.get_by_username(), get_by_id(), create_user(), list_users(), archive_user()</td></tr>
+    <tr class="new"><td>*</td><td></td><td class="after">Admin seed: username=admin, password=admin@123, role=admin</td></tr>
+  </table>
+
+  <h3 class="sub">5.2 backend/app/utils/auth_utils.py — NEW: Token Authentication</h3>
+  <p style="margin-bottom:8px;font-size:12px">In-memory UUID token store. Tokens are 7-day TTL. Two Flask decorator factories for route protection.</p>
+  <table class="diff">
+    <tr class="new"><td>*</td><td></td><td class="after">generate_token(user_id) → uuid4 string stored in _tokens dict</td></tr>
+    <tr class="new"><td>*</td><td></td><td class="after">revoke_token(token) → removes from dict</td></tr>
+    <tr class="new"><td>*</td><td></td><td class="after">get_current_user() → validates Bearer header, checks expiry</td></tr>
+    <tr class="new"><td>*</td><td></td><td class="after">@login_required — returns 401 if no valid token</td></tr>
+    <tr class="new"><td>*</td><td></td><td class="after">@admin_required — returns 403 if user.role != 'admin'</td></tr>
+    <tr class="new"><td>*</td><td></td><td class="after">TOKEN_TTL_HOURS = 168  (7 days)</td></tr>
+  </table>
+
+  <h3 class="sub">5.3 backend/app/api/auth.py — NEW: Auth API</h3>
+  <table class="ep">
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td class="method-post">POST</td><td><code>/api/auth/login</code></td><td>—</td><td>Validate credentials; return JWT-style token + user object</td></tr>
+      <tr><td class="method-post">POST</td><td><code>/api/auth/register</code></td><td>—</td><td>Create new user; validates username ≥3 chars, password ≥6 chars</td></tr>
+      <tr><td class="method-post">POST</td><td><code>/api/auth/logout</code></td><td>Bearer</td><td>Revoke current token</td></tr>
+      <tr><td class="method-get">GET</td><td><code>/api/auth/me</code></td><td>Bearer</td><td>Return current user's profile</td></tr>
+      <tr><td class="method-get">GET</td><td><code>/api/auth/model-requests</code></td><td>Admin</td><td>List pending model-change requests from users</td></tr>
+      <tr><td class="method-post">POST</td><td><code>/api/auth/model-requests</code></td><td>Bearer</td><td>Submit a model-change request (user → admin queue)</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">5.4 backend/app/api/scraper.py — NEW: Live Intelligence Feed</h3>
+  <p style="margin-bottom:8px;font-size:12px">Polls four public sources using only stdlib (<code>urllib</code>, <code>xml.etree</code>) — no third-party scraping dependency required. Results cached in memory.</p>
+  <div class="callout callout-teal">
+    <strong>Data Sources</strong>
+    • <b>HackerNews</b> — top 8 stories via Firebase REST API<br/>
+    • <b>BBC News RSS</b> — <code>http://feeds.bbci.co.uk/news/rss.xml</code> (latest 8 items)<br/>
+    • <b>Reuters RSS</b> — <code>https://feeds.reuters.com/reuters/topNews</code> (latest 8 items)<br/>
+    • <b>Reddit WorldNews</b> — <code>https://www.reddit.com/r/worldnews/top.json?limit=8</code>
+  </div>
+  <table class="ep">
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td class="method-get">GET</td><td><code>/api/scraper/news</code></td><td>Return merged article list from all sources; cache TTL 5 min</td></tr>
+      <tr><td class="method-post">POST</td><td><code>/api/scraper/refresh</code></td><td>Force cache invalidation and re-scrape</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">5.5 frontend/src/views/LoginView.vue — NEW</h3>
+  <p style="margin-bottom:8px;font-size:12px">Two-tab card (Sign In / Register) with inline SVG fish logo, Mu-Sigma brand tagline <em>"Decision Intelligence Simulation Platform"</em>, and theme toggle. Saves token + user to localStorage on success.</p>
+  <div class="callout callout-blue">
+    <strong>Key behaviours</strong>
+    • Tab switch clears error state.<br/>
+    • Register enforces username ≥3, password ≥6 client-side before hitting API.<br/>
+    • On success: <code>setAuth(token, user)</code> → router.push('/splash').
+  </div>
+
+  <h3 class="sub">5.6 frontend/src/views/SplashView.vue — NEW</h3>
+  <p style="margin-bottom:8px;font-size:12px">Post-login landing screen: animated fish SVG (NeonFish variant), session welcome message, "Enter Simulation" CTA. Acts as the brand moment before the main app.</p>
+
+  <h3 class="sub">5.7 frontend/src/store/auth.js + theme.js — NEW</h3>
+  <table class="diff">
+    <tr class="new"><td>*</td><td></td><td class="after">auth.js → currentUser ref, isLoggedIn/isAdmin computed, setAuth(), clearAuth(), loadFromStorage()</td></tr>
+    <tr class="new"><td>*</td><td></td><td class="after">theme.js → theme ref, isDark computed, toggleTheme(), initTheme() (sets data-theme on &lt;html&gt;)</td></tr>
+  </table>
+
+  <h3 class="sub">5.8 frontend/src/components/NeonFish.vue — NEW: Brand Mascot</h3>
+  <p style="margin-bottom:8px;font-size:12px">Animated SVG fish with layered Gaussian glow filters. Emits rising bubble particles at randomised intervals via JavaScript animation loop. Used on the splash screen and home page.</p>
+
+  <h3 class="sub">5.9 frontend/src/components/ScrapeBanner.vue — NEW</h3>
+  <p style="margin-bottom:8px;font-size:12px">Slim status bar showing: INFORMATION BASIS label, scrape timestamp, article count, source list, and an auto-scrolling headline ticker. Freshness class (green/amber/red) based on age of last scrape.</p>
+
+  <h3 class="sub">5.10 frontend/src/components/QuestionBanner.vue — NEW</h3>
+  <p style="margin-bottom:8px;font-size:12px">Collapsible OBJECTIVE banner. Left side: quote icon + simulation question text (expandable on click). Right side: source document chips with file icon and truncated name. Used in Step 2, Step 3, and InteractionView.</p>
+
+  <h3 class="sub">5.11 frontend/src/router/index.js — Auth Guard</h3>
+  <table class="diff">
+    <tr class="add"><td>+</td><td></td><td class="after">router.beforeEach: if (!isLoggedIn &amp;&amp; to.path !== '/login') → redirect to /login</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">Routes added: /login → LoginView, /splash → SplashView</td></tr>
+  </table>
+
+  <h3 class="sub">5.12 frontend/src/main.js</h3>
+  <table class="diff">
+    <tr class="add"><td>+</td><td></td><td class="after">loadFromStorage()  // hydrate auth store from localStorage on boot</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">initTheme()         // apply saved theme to &lt;html data-theme&gt; on boot</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     6. PHASE 3 — SIMULATION ENHANCEMENT & UI POLISH (20 JUN 2026)
+════════════════════════════════════════════════════════════ -->
+<div class="section" id="s6">
+  <div class="section-header"><div class="section-num">6</div><h2 class="sec">Phase 3 — Simulation Enhancement &amp; UI Polish <span style="font-size:13px;font-weight:400;color:var(--amber)">20 Jun 2026</span></h2></div>
+  <hr class="sec-rule"/>
+
+  <h3 class="sub">6.1 backend/app/api/simulation.py — 6 New Endpoints</h3>
+  <table class="ep">
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td class="method-get">GET</td><td><code>/api/simulation/&lt;id&gt;/ontology</code></td><td>Read entity types + edge types from Neo4j storage for this simulation's graph</td></tr>
+      <tr><td class="method-post">POST</td><td><code>/api/simulation/pause</code></td><td>SIGTERM the simulation subprocess; set status = PAUSED in state.json</td></tr>
+      <tr><td class="method-put">PUT</td><td><code>/api/simulation/&lt;id&gt;/agents</code></td><td>Patch agent configs (influence, activity sliders) and reorder in simulation_config.json</td></tr>
+      <tr><td class="method-post">POST</td><td><code>/api/simulation/resume</code></td><td>Mark simulation READY; restart subprocess from current state</td></tr>
+      <tr><td class="method-post">POST</td><td><code>/api/simulation/&lt;id&gt;/inject-event</code></td><td>Prepend a synthetic post/event to the simulation's event queue immediately</td></tr>
+      <tr><td class="method-get">GET</td><td><code>/api/simulation/&lt;id&gt;/llm-calls</code></td><td>Stream last N entries from <code>llm_calls.jsonl</code> for this simulation run</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">6.2 backend/app/services/ontology_generator.py — Hardened</h3>
+  <p style="margin-bottom:8px;font-size:12px">The <code>_validate_and_process</code> method was strengthened to guarantee a usable ontology regardless of LLM output quality.</p>
+  <table class="diff">
+    <tr class="add"><td>+</td><td></td><td class="after">Universal fallbacks: Person + Organization always present as last 2 entity types</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">Hard cap: entity_types[:10], edge_types[:10]</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">Description truncation: max 100 chars (+ "..." if exceeded)</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">Trim domain-specific types to make room for fallbacks if at cap</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">generate_python_code() marked [DEPRECATED] — kept for reference only</td></tr>
+  </table>
+
+  <h3 class="sub">6.3 backend/app/services/simulation_manager.py — Pause/Resume State Machine</h3>
+  <table class="diff">
+    <tr class="add"><td>+</td><td></td><td class="after">pause_simulation(sim_id) → SIGTERM subprocess, write status=PAUSED to state.json</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">resume_simulation(sim_id) → reset to READY, re-spawn subprocess</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">get_simulation_ontology(sim_id) → reads graph_id from config, queries Neo4j storage</td></tr>
+  </table>
+
+  <h3 class="sub">6.4 frontend/src/components/Step3Simulation.vue — Major Overhaul</h3>
+  <h4 class="sub2">Pause &amp; Rearrange Overlay</h4>
+  <div class="callout callout-amber">
+    <strong>Interaction flow</strong>
+    • "Pause &amp; Rearrange" button → <code>POST /api/simulation/pause</code> → full-screen overlay modal.<br/>
+    • Overlay lists agents with influence slider, activity slider, ↑↓ reorder arrows.<br/>
+    • "Inject Event" text field → <code>POST /api/simulation/&lt;id&gt;/inject-event</code>.<br/>
+    • "Save &amp; Resume" → <code>PUT /api/simulation/&lt;id&gt;/agents</code> then <code>POST /api/simulation/resume</code>.
+  </div>
+
+  <h4 class="sub2">Bag Ontology Panel</h4>
+  <div class="callout callout-teal">
+    <strong>Interaction flow</strong>
+    • Antenna-icon toggle → calls <code>GET /api/simulation/&lt;id&gt;/ontology</code>.<br/>
+    • Entity types rendered as teal badges; edge types as amber badges.<br/>
+    • Panel slides in from right without disrupting the simulation progress view.
+  </div>
+
+  <h4 class="sub2">LLM Log Panel</h4>
+  <div class="callout callout-blue">
+    <strong>Interaction flow</strong>
+    • Chat-bubble-icon toggle → opens right-side panel, auto-polls every 5 s.<br/>
+    • Each entry: model name, call tag, elapsed time, one-line prompt preview.<br/>
+    • Clicking an entry expands full prompt messages + model response inline.<br/>
+    • Calls <code>GET /api/simulation/&lt;id&gt;/llm-calls</code> for per-simulation history.
+  </div>
+
+  <h3 class="sub">6.5 frontend/src/components/LlmPopup.vue — NEW: Floating Conversation Log</h3>
+  <p style="margin-bottom:8px;font-size:12px">Draggable floating panel (mouse-drag on header). Teleports to <code>&lt;body&gt;</code> to avoid z-index conflicts. Shows live/historical LLM calls with pulse dot when actively polling. Minimisable. Used in SimulationRunView and Step5Interaction.</p>
+
+  <h3 class="sub">6.6 All API Clients — Auth Header Injection</h3>
+  <table class="diff">
+    <tr class="add"><td>+</td><td></td><td class="after">graph.js, report.js, simulation.js: Authorization: Bearer &lt;token&gt; header on all requests</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">simulation.js: pauseSimulation(), resumeSimulation(), updateAgentConfigs(), injectEvent(), getSimulationOntology(), getSimulationLlmCalls() added</td></tr>
+  </table>
+
+  <h3 class="sub">6.7 UI Polish — Theming Across All Views</h3>
+  <p style="margin-bottom:8px;font-size:12px">All views and step components now bind <code>:data-theme="theme"</code> and use CSS custom properties defined in <code>home-styles.css</code> so dark/light toggle works globally without component-level duplication.</p>
+  <table class="diff">
+    <tr class="add"><td>+</td><td></td><td class="after">home-styles.css: --bg, --surface, --text, --border CSS vars for both themes</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">App.vue: :data-theme bound to theme store at root</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">Home.vue: NeonFish mascot + ScrapeBanner integrated into home page</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">MainView.vue: user display + logout button in header nav</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     7. ARCHITECTURE OVERVIEW
+════════════════════════════════════════════════════════════ -->
+<div class="section" id="s7">
+  <div class="section-header"><div class="section-num">7</div><h2 class="sec">Architecture Overview</h2></div>
+  <hr class="sec-rule"/>
+  <pre class="arch">
+  Browser  http://&lt;host&gt;:3010  (Vue 3 + Vite)
+    │
+    │  /api/*  ──── Vite proxy ──▶  Flask :5010
+    │                                    │
+    │                      ┌─────────────┼──────────────────┐
+    │                      │             │                  │
+    │                 Auth Module     Neo4j :7687     Ollama :11434
+    │                 (JWT tokens)   (localhost)    (172.25.1.70)
+    │                      │
+    │              ┌────────┴─────────────────────────────┐
+    │              │              Services                 │
+    │              │  OntologyGenerator  GraphBuilder      │
+    │              │  SimulationManager  ReportAgent       │
+    │              │  NERExtractor       EntityReader      │
+    │              └──────────────────────────────────────┘
+    │
+    ├── /login          LoginView   →  POST /api/auth/login
+    ├── /splash         SplashView  →  welcome screen
+    ├── /home           Home.vue    →  NeonFish + ScrapeBanner
+    ├── /process/:id    5-step workflow
+    │     Step 1  GraphBuild   →  POST /api/graph/build
+    │     Step 2  EnvSetup     →  GET /api/scraper/news
+    │     Step 3  Simulation   →  pause/resume/ontology/LLM-log
+    │     Step 4  Report       →  GET /api/report/:id
+    │     Step 5  Interaction  →  GET /api/interaction/:id
+    ├── /simulation/:id         SimulationView
+    ├── /simulation-run/:id     SimulationRunView  →  LlmPopup
+    ├── /report/:id             ReportView
+    └── /interaction/:id        InteractionView    →  QuestionBanner
+
+  ModelChooser  ──── GET /api/settings/models ──▶ Ollama /api/tags
+  LlmPopup      ──── GET /api/simulation/:id/llm-calls (poll 5s)
+  ScrapeBanner  ──── GET /api/scraper/news (poll 5 min)
+  </pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     8. HOW TO RUN
+════════════════════════════════════════════════════════════ -->
+<div class="section" id="s8">
+  <div class="section-header"><div class="section-num">8</div><h2 class="sec">How to Run</h2></div>
+  <hr class="sec-rule"/>
+  <p style="margin-bottom:12px;font-size:12px">All services run bare-metal. Only Neo4j requires Docker.</p>
+<pre class="code">
+<span class="c"># 1. Start Neo4j (5.18 Community)</span>
+docker run -d --name mirofish-neo4j \
+  -p 7474:7474 -p 7687:7687 \
+  -e NEO4J_AUTH=neo4j/mirofish \
+  neo4j:5.18-community
+
+<span class="c"># 2. Install Python deps</span>
+pip install -r backend/requirements.txt
+
+<span class="c"># 3. Start Flask backend (reads .env → port 5010)</span>
+python3 backend/run.py
+
+<span class="c"># 4. Start Vue frontend</span>
+cd frontend
+npm install
+npm run dev -- --port 3010 --host 0.0.0.0
+
+<span class="c"># App:    http://&lt;host&gt;:3010   (login: admin / admin@123)</span>
+<span class="c"># API:    http://&lt;host&gt;:5010</span>
+<span class="c"># Neo4j:  http://&lt;host&gt;:7474</span>
+</pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     9. APPENDIX — PYDANTIC NER UPGRADE PLAN
+════════════════════════════════════════════════════════════ -->
+<div class="section" id="s9">
+  <div class="section-header"><div class="section-num">9</div><h2 class="sec">Appendix — Pydantic NER Upgrade Plan</h2></div>
+  <hr class="sec-rule"/>
+  <div class="callout callout-teal">
+    <strong>Status: Implemented — ner_extractor.py updated (20 Jun 2026)</strong>
+    The current prompt-based NER extractor has been replaced with a Pydantic structured-output pipeline (graphiti-style). The fallback path is preserved in full for models that do not support json_schema response_format.
+  </div>
+
+  <h3 class="sub">A1. Current Approach — Limitations</h3>
+  <p style="margin-bottom:8px;font-size:12px">The current <code>NERExtractor</code> sends a free-form JSON prompt to the LLM and retries up to 2× on invalid JSON. This is fragile: the LLM can hallucinate type names, produce malformed JSON, or include entities outside the ontology schema without any protocol-level enforcement.</p>
+
+  <h3 class="sub">A2. Proposed Approach — graphiti-style Pydantic Models</h3>
+  <p style="margin-bottom:8px;font-size:12px">Graphiti's extraction pipeline defines entity types as <code>pydantic.BaseModel</code> subclasses and uses OpenAI's <code>response_format</code> / tool-calling structured output to extract instances. The LLM is constrained to the Pydantic schema at the protocol layer — invalid JSON and hallucinated field names become impossible.</p>
+  <p style="margin-bottom:12px;font-size:12px">For MiroFish, since the ontology is generated dynamically from user documents, we use <code>pydantic.create_model()</code> to build the models at runtime from the JSON ontology.</p>
+
+  <h3 class="sub">A3. Before vs After Comparison</h3>
+  <table class="cmp">
+    <thead><tr><th>Dimension</th><th>Current (prompt-based)</th><th>Proposed (Pydantic structured)</th></tr></thead>
+    <tbody>
+      <tr><td>JSON validity guarantee</td><td><span class="cross">✗</span> LLM retries (max 3)</td><td><span class="tick">✓</span> Protocol-level enforcement</td></tr>
+      <tr><td>Schema adherence</td><td><span class="cross">✗</span> LLM can hallucinate types</td><td><span class="tick">✓</span> Rejected at response parse</td></tr>
+      <tr><td>New dependencies</td><td><span class="neutral">—</span> None</td><td><span class="tick">✓</span> None — pydantic already installed</td></tr>
+      <tr><td>Offline compatible</td><td><span class="tick">✓</span> Yes</td><td><span class="tick">✓</span> Yes (needs function-calling capable model)</td></tr>
+      <tr><td>Code complexity</td><td><span class="neutral">Low</span></td><td><span class="neutral">Low</span> — create_model() + parse()</td></tr>
+      <tr><td>Attribute extraction</td><td>Free-form dict</td><td>Typed fields with descriptions</td></tr>
+      <tr><td>Model compatibility</td><td>Any model</td><td>Requires tool/function-calling support (Qwen2.5+, Claude, GPT)</td></tr>
+      <tr><td>Files changed</td><td>—</td><td>ner_extractor.py only (~40 lines)</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">A4. Implementation — What Was Changed</h3>
+  <p style="margin-bottom:8px;font-size:12px">Only <code>backend/app/storage/ner_extractor.py</code> was modified (~240 lines). No other files touched. No new pip dependencies.</p>
+  <table class="diff">
+    <tr class="add"><td>+</td><td></td><td class="after">_RelationItem(BaseModel) — fixed schema for all relation instances</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">_make_entity_model(entity_def) → create_model() per ontology entity type</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">_make_extraction_model(ontology) → top-level ExtractionResult with per-type List fields</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">_extract_structured() — json_schema response_format + Pydantic model_validate()</td></tr>
+    <tr class="add"><td>+</td><td></td><td class="after">_pydantic_to_dict() — converts validated Pydantic object to {entities, relations} dict</td></tr>
+    <tr class="mod"><td>~</td><td class="before">extract() → direct chat_json() with retries</td><td class="after">extract() → _extract_structured() with fallback to _extract_prompt()</td></tr>
+    <tr class="mod"><td>~</td><td class="before">_extract_prompt() (was the only path)</td><td class="after">_extract_prompt() (now the fallback path — code unchanged)</td></tr>
+  </table>
+
+  <h3 class="sub">A5. Implementation Sketch</h3>
+<pre class="code">
+<span class="c"># ner_extractor.py — proposed replacement for _extract_with_prompt()</span>
+from pydantic import create_model, Field
+from typing import Optional, List
+import json
+
+def _build_entity_model(entity_def: dict):
+    <span class="k">"""Build a Pydantic model from an ontology entity_type dict at runtime."""</span>
+    fields = {
+        <span class="s">"entity_name"</span>: (str, Field(..., description=<span class="s">"Canonical entity name"</span>)),
+        <span class="s">"entity_type"</span>: (str, Field(entity_def[<span class="s">"name"</span>], description=<span class="s">"Entity type"</span>)),
+    }
+    for attr in entity_def.get(<span class="s">"attributes"</span>, []):
+        fields[attr[<span class="s">"name"</span>]] = (
+            Optional[str],
+            Field(None, description=attr.get(<span class="s">"description"</span>, attr[<span class="s">"name"</span>]))
+        )
+    return create_model(entity_def[<span class="s">"name"</span>], **fields)
+
+def _build_extraction_model(ontology: dict):
+    <span class="k">"""Compose a top-level model holding lists of each entity type."""</span>
+    entity_models = {
+        e[<span class="s">"name"</span>]: (List[_build_entity_model(e)], Field(default_factory=list))
+        for e in ontology.get(<span class="s">"entity_types"</span>, [])
+    }
+    return create_model(<span class="s">"ExtractionResult"</span>, **entity_models)
+
+<span class="c"># In NERExtractor.extract():</span>
+ExtractionModel = _build_extraction_model(ontology)
+response = self.llm.client.beta.chat.completions.parse(
+    model=self.llm.model,
+    messages=messages,
+    response_format=ExtractionModel,
+)
+result = response.choices[0].message.parsed
+</pre>
+
+  <div class="callout callout-amber">
+    <strong>Prerequisite</strong>
+    Ollama model must support function calling / tool use. Qwen2.5:32b, Qwen3:8b, Llama3.1+, Mistral-Nemo all support this. Verify with <code>ollama show &lt;model&gt;</code> and check for <code>tools</code> capability. Fallback: if parse() raises, the extractor can gracefully degrade to the current prompt-based method.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════════════════════════ -->
+<footer>
+  <span>MiroFish-Offline · Engineering Change Report v2.0 · Mu-Sigma Decision Sciences</span>
+  <span>Prepared: Hariharan M · hariharan.m@mu-sigma.com<br/>Report Period: 15 Jun – 20 Jun 2026</span>
+</footer>
+
+</div>
+</body>
+</html>

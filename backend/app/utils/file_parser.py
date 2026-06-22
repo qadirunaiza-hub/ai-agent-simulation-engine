@@ -1,8 +1,9 @@
 """
 File Parser Utility
-Supports text extraction from PDF, Markdown, TXT files
+Supports text extraction from PDF, Markdown, TXT, JSON files
 """
 
+import json
 import os
 from pathlib import Path
 from typing import List, Optional
@@ -61,7 +62,7 @@ def _read_text_with_fallback(file_path: str) -> str:
 class FileParser:
     """File Parser"""
 
-    SUPPORTED_EXTENSIONS = {'.pdf', '.md', '.markdown', '.txt'}
+    SUPPORTED_EXTENSIONS = {'.pdf', '.md', '.markdown', '.txt', '.json'}
 
     @classmethod
     def extract_text(cls, file_path: str) -> str:
@@ -90,6 +91,8 @@ class FileParser:
             return cls._extract_from_md(file_path)
         elif suffix == '.txt':
             return cls._extract_from_txt(file_path)
+        elif suffix == '.json':
+            return cls._extract_from_json(file_path)
 
         raise ValueError(f"Cannot handle file format: {suffix}")
 
@@ -119,6 +122,31 @@ class FileParser:
     def _extract_from_txt(file_path: str) -> str:
         """Extract text from TXT with automatic encoding detection"""
         return _read_text_with_fallback(file_path)
+
+    @staticmethod
+    def _extract_from_json(file_path: str) -> str:
+        """Flatten JSON into readable key-value text for graph extraction."""
+        raw = _read_text_with_fallback(file_path)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return raw
+
+        def _flatten(obj, prefix=""):
+            lines = []
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    key = f"{prefix}.{k}" if prefix else k
+                    lines.extend(_flatten(v, key))
+            elif isinstance(obj, list):
+                for i, item in enumerate(obj):
+                    key = f"{prefix}[{i}]"
+                    lines.extend(_flatten(item, key))
+            else:
+                lines.append(f"{prefix}: {obj}")
+            return lines
+
+        return "\n".join(_flatten(data))
 
     @classmethod
     def extract_from_multiple(cls, file_paths: List[str]) -> str:

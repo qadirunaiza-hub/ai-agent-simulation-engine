@@ -1,5 +1,10 @@
 <template>
   <div class="simulation-panel">
+    <!-- Live Scrape Banner -->
+    <ScrapeBanner />
+
+    <!-- LLM Transparency Floating Popup -->
+    <LlmPopup v-if="showLlmLog" :simulation-id="simulationId" @close="showLlmLog = false" />
     <!-- Top Control Bar -->
     <div class="control-bar">
       <div class="status-group">
@@ -91,13 +96,35 @@
       </div>
 
       <div class="action-controls">
-        <button 
+        <!-- Pause / Resume -->
+        <button
+          v-if="phase === 1"
+          class="action-btn secondary"
+          :disabled="isPausing"
+          @click="handlePause"
+        >{{ isPausing ? 'Pausing…' : 'Pause & Rearrange' }}</button>
+
+        <button
+          v-if="isPaused"
+          class="action-btn secondary"
+          @click="handleResume"
+        >Resume</button>
+
+        <!-- Sidebar toggles -->
+        <button class="action-btn icon-btn" :class="{ active: showOntology }" @click="showOntology = !showOntology" title="Bag Ontology">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"></path></svg>
+        </button>
+        <button class="action-btn icon-btn" :class="{ active: showLlmLog }" @click="toggleLlmLog" title="LLM Transparency">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        </button>
+
+        <button
           class="action-btn primary"
           :disabled="phase !== 2 || isGeneratingReport"
           @click="handleNextStep"
         >
           <span v-if="isGeneratingReport" class="loading-spinner-small"></span>
-          {{ isGeneratingReport ? 'Starting...' : 'Start Generating Report' }} 
+          {{ isGeneratingReport ? 'Starting...' : 'Start Generating Report' }}
           <span v-if="!isGeneratingReport" class="arrow-icon">→</span>
         </button>
       </div>
@@ -269,6 +296,90 @@
       </div>
     </div>
 
+    <!-- Pause / Rearrange Overlay -->
+    <div v-if="isPaused" class="rearrange-overlay">
+      <div class="rearrange-panel">
+      <div class="rp-header">
+        <span class="rp-title">PAUSED — Rearrange Agents</span>
+        <button class="rp-close" @click="isPaused = false">×</button>
+      </div>
+
+      <!-- Inject Event -->
+      <div class="rp-section">
+        <div class="rp-section-title">Inject Event into Simulation</div>
+        <div class="inject-row">
+          <input v-model="injectContent" class="inject-input" placeholder="Type a breaking-news post or event…" />
+          <button class="inject-btn" @click="doInjectEvent" :disabled="!injectContent.trim()">Inject</button>
+        </div>
+        <div v-if="injectMsg" class="inject-msg">{{ injectMsg }}</div>
+      </div>
+
+      <!-- Agent List -->
+      <div class="rp-section">
+        <div class="rp-section-title">Agent Activity & Stance</div>
+        <div class="agent-list">
+          <div v-for="(ag, idx) in editableAgents" :key="ag.agent_id" class="agent-row">
+            <span class="ag-rank">{{ idx + 1 }}</span>
+            <div class="ag-info">
+              <span class="ag-name">{{ ag.entity_name || ag.name || 'Agent ' + ag.agent_id }}</span>
+              <span class="ag-type">{{ ag.entity_type }}</span>
+            </div>
+            <div class="ag-controls">
+              <label class="ag-label">Activity</label>
+              <input type="range" min="0" max="1" step="0.05" v-model.number="ag.activity_level" class="ag-slider" />
+              <span class="ag-val">{{ (ag.activity_level * 100).toFixed(0) }}%</span>
+              <select v-model="ag.stance" class="ag-select">
+                <option value="neutral">Neutral</option>
+                <option value="supportive">Supportive</option>
+                <option value="opposing">Opposing</option>
+                <option value="observer">Observer</option>
+              </select>
+            </div>
+            <div class="ag-order-btns">
+              <button @click="moveAgent(idx, -1)" :disabled="idx === 0">↑</button>
+              <button @click="moveAgent(idx, 1)" :disabled="idx === editableAgents.length - 1">↓</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rp-footer">
+        <button class="rp-save" @click="saveAndResume">Save & Resume</button>
+        <button class="rp-cancel" @click="isPaused = false">Cancel</button>
+      </div>
+      </div>
+    </div>
+
+    <!-- Ontology Panel -->
+    <div v-if="showOntology" class="side-panel ontology-panel">
+      <div class="sp-header">
+        <span>BAG ONTOLOGY</span>
+        <button class="sp-close" @click="showOntology = false">×</button>
+      </div>
+      <div v-if="ontologyLoading" class="sp-loading">Loading…</div>
+      <div v-else-if="ontology" class="sp-content">
+        <div class="onto-section">
+          <div class="onto-section-title">Entity Types ({{ ontology.entity_types?.length || 0 }})</div>
+          <div v-for="et in ontology.entity_types" :key="et.name" class="onto-item">
+            <span class="onto-name">{{ et.name }}</span>
+            <span class="onto-desc">{{ et.description }}</span>
+            <div v-if="et.examples?.length" class="onto-examples">eg: {{ et.examples.slice(0,2).join(', ') }}</div>
+          </div>
+        </div>
+        <div class="onto-section">
+          <div class="onto-section-title">Edge Types ({{ ontology.edge_types?.length || 0 }})</div>
+          <div v-for="edge in ontology.edge_types" :key="edge.name" class="onto-item">
+            <span class="onto-name edge">{{ edge.name }}</span>
+            <span class="onto-desc">{{ edge.description }}</span>
+          </div>
+        </div>
+      </div>
+      <div v-else class="sp-empty">No ontology data available.</div>
+    </div>
+
+    <!-- LLM Transparency Panel -->
+    <!-- LLM popup is now a floating draggable window (see <LlmPopup> at top) -->
+
     <!-- Bottom Info / Logs -->
     <div class="system-logs">
       <div class="log-header">
@@ -288,13 +399,23 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { 
-  startSimulation, 
+import LlmPopup from './LlmPopup.vue'
+import ScrapeBanner from './ScrapeBanner.vue'
+import {
+  startSimulation,
   stopSimulation,
-  getRunStatus, 
+  getRunStatus,
   getRunStatusDetail
 } from '../api/simulation'
 import { generateReport } from '../api/report'
+import {
+  pauseSimulation,
+  resumeSimulation,
+  updateAgentConfigs,
+  injectEvent,
+  getSimulationOntology,
+  getSimulationLlmCalls
+} from '../api/settings'
 
 const props = defineProps({
   simulationId: String,
@@ -317,11 +438,29 @@ const isGeneratingReport = ref(false)
 const phase = ref(0) // 0: Not started, 1: Running, 2: Completed
 const isStarting = ref(false)
 const isStopping = ref(false)
+const isPausing = ref(false)
+const isPaused = ref(false)
 const startError = ref(null)
 const runStatus = ref({})
 const allActions = ref([]) // All actions (incremental accumulation)
 const actionIds = ref(new Set()) // Action IDs set for deduplication
 const scrollContainer = ref(null)
+
+// Ontology
+const showOntology = ref(false)
+const ontology = ref(null)
+const ontologyLoading = ref(false)
+
+// LLM Transparency
+const showLlmLog = ref(false)
+const llmCalls = ref([])
+const expandedCall = ref(null)
+let llmPollTimer = null
+
+// Rearrange
+const editableAgents = ref([])
+const injectContent = ref('')
+const injectMsg = ref('')
 
 // Computed
 // Display actions in chronological order (newest at the bottom)
@@ -674,6 +813,134 @@ const handleNextStep = async () => {
   }
 }
 
+// ===== Pause / Resume / Rearrange =====
+
+const handlePause = async () => {
+  if (!props.simulationId) return
+  isPausing.value = true
+  addLog('Pausing simulation…')
+  try {
+    await pauseSimulation(props.simulationId)
+    stopPolling()
+    phase.value = 0
+    isPaused.value = true
+    addLog('✓ Simulation paused. Rearrange agents and resume when ready.')
+    emit('update-status', 'paused')
+    // Load agents for rearranging
+    await loadEditableAgents()
+  } catch (e) {
+    addLog('✗ Pause failed: ' + e.message)
+  } finally {
+    isPausing.value = false
+  }
+}
+
+const loadEditableAgents = async () => {
+  if (!props.simulationId) return
+  try {
+    const { getSimulationConfig } = await import('../api/simulation')
+    const res = await getSimulationConfig(props.simulationId)
+    if (res.success && res.data?.agent_configs) {
+      editableAgents.value = res.data.agent_configs.map(a => ({ ...a }))
+    }
+  } catch (_) {}
+}
+
+const moveAgent = (idx, dir) => {
+  const arr = editableAgents.value
+  const target = idx + dir
+  if (target < 0 || target >= arr.length) return
+  const tmp = arr[idx]; arr[idx] = arr[target]; arr[target] = tmp
+  editableAgents.value = [...arr]
+}
+
+const doInjectEvent = async () => {
+  const content = injectContent.value.trim()
+  if (!content || !props.simulationId) return
+  try {
+    await injectEvent(props.simulationId, content, 'User')
+    injectMsg.value = '✓ Event injected — will appear in next run'
+    injectContent.value = ''
+    setTimeout(() => { injectMsg.value = '' }, 4000)
+  } catch (e) {
+    injectMsg.value = '✗ ' + e.message
+  }
+}
+
+const saveAndResume = async () => {
+  if (!props.simulationId) return
+  try {
+    // Save agent patches + order
+    const order = editableAgents.value.map(a => a.agent_id)
+    await updateAgentConfigs(props.simulationId, editableAgents.value, order)
+    addLog('✓ Agent configs saved')
+    isPaused.value = false
+    await handleResume()
+  } catch (e) {
+    addLog('✗ Save failed: ' + e.message)
+  }
+}
+
+const handleResume = async () => {
+  if (!props.simulationId) return
+  addLog('Resuming simulation…')
+  try {
+    const res = await resumeSimulation(props.simulationId, { platform: 'parallel' })
+    if (res.success) {
+      phase.value = 1
+      isPaused.value = false
+      runStatus.value = res.data
+      startStatusPolling()
+      startDetailPolling()
+      addLog('✓ Simulation resumed')
+      emit('update-status', 'processing')
+    } else {
+      addLog('✗ Resume failed: ' + (res.error || 'unknown'))
+    }
+  } catch (e) {
+    addLog('✗ Resume error: ' + e.message)
+  }
+}
+
+// ===== Ontology =====
+
+const loadOntology = async () => {
+  if (!props.simulationId || ontology.value) return
+  ontologyLoading.value = true
+  try {
+    const res = await getSimulationOntology(props.simulationId)
+    if (res.success) ontology.value = res.data?.ontology
+  } catch (_) {}
+  finally { ontologyLoading.value = false }
+}
+
+watch(showOntology, (v) => { if (v) loadOntology() })
+
+// ===== LLM Transparency =====
+
+const fetchLlmCalls = async () => {
+  if (!props.simulationId || !showLlmLog.value) return
+  try {
+    const res = await getSimulationLlmCalls(props.simulationId, 60)
+    if (res.success) llmCalls.value = res.data?.calls || []
+  } catch (_) {}
+}
+
+const toggleLlmLog = () => {
+  showLlmLog.value = !showLlmLog.value
+  if (showLlmLog.value) {
+    fetchLlmCalls()
+    llmPollTimer = setInterval(fetchLlmCalls, 4000)
+  } else {
+    clearInterval(llmPollTimer); llmPollTimer = null
+  }
+}
+
+const formatLlmTime = (ts) => {
+  if (!ts) return ''
+  try { return new Date(ts).toLocaleTimeString('en-US', { hour12: false }) } catch { return '' }
+}
+
 // Scroll log to bottom
 const logContent = ref(null)
 watch(() => props.systemLogs?.length, () => {
@@ -693,6 +960,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopPolling()
+  if (llmPollTimer) clearInterval(llmPollTimer)
 })
 </script>
 
@@ -701,14 +969,14 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #FFFFFF;
+  background: var(--bg2);
   font-family: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
   overflow: hidden;
 }
 
 /* --- Control Bar --- */
 .control-bar {
-  background: #FFF;
+  background: var(--bg2);
   padding: 12px 24px;
   display: flex;
   justify-content: space-between;
@@ -730,7 +998,7 @@ onUnmounted(() => {
   gap: 4px;
   padding: 6px 12px;
   border-radius: 4px;
-  background: #FAFAFA;
+  background: var(--bg3);
   border: 1px solid #EAEAEA;
   opacity: 0.7;
   transition: all 0.3s;
@@ -741,8 +1009,8 @@ onUnmounted(() => {
 
 .platform-status.active {
   opacity: 1;
-  border-color: #333;
-  background: #FFF;
+  border-color: var(--text);
+  background: var(--bg2);
 }
 
 .platform-status.completed {
@@ -790,7 +1058,7 @@ onUnmounted(() => {
 .tooltip-title {
   font-size: 10px;
   font-weight: 600;
-  color: #999;
+  color: var(--text3);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-bottom: 8px;
@@ -822,13 +1090,13 @@ onUnmounted(() => {
 .platform-name {
   font-size: 11px;
   font-weight: 700;
-  color: #000;
+  color: var(--text);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.platform-status.twitter .platform-icon { color: #000; }
-.platform-status.reddit .platform-icon { color: #000; }
+.platform-status.twitter .platform-icon { color: var(--text); }
+.platform-status.reddit .platform-icon { color: var(--text); }
 
 .platform-stats {
   display: flex;
@@ -843,7 +1111,7 @@ onUnmounted(() => {
 
 .stat-label {
   font-size: 8px;
-  color: #999;
+  color: var(--text3);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -852,12 +1120,12 @@ onUnmounted(() => {
 .stat-value {
   font-size: 11px;
   font-weight: 600;
-  color: #333;
+  color: var(--text);
 }
 
 .stat-total, .stat-unit {
   font-size: 9px;
-  color: #999;
+  color: var(--text3);
   font-weight: 400;
 }
 
@@ -903,7 +1171,7 @@ onUnmounted(() => {
   flex: 1;
   overflow-y: auto;
   position: relative;
-  background: #FFF;
+  background: var(--bg2);
 }
 
 /* Timeline Header */
@@ -924,7 +1192,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 16px;
   font-size: 11px;
-  color: #666;
+  color: var(--text2);
   background: #F5F5F5;
   padding: 4px 12px;
   border-radius: 20px;
@@ -932,7 +1200,7 @@ onUnmounted(() => {
 
 .total-count {
   font-weight: 600;
-  color: #333;
+  color: var(--text);
 }
 
 .platform-breakdown {
@@ -948,8 +1216,8 @@ onUnmounted(() => {
 }
 
 .breakdown-divider { color: #DDD; }
-.breakdown-item.twitter { color: #000; }
-.breakdown-item.reddit { color: #000; }
+.breakdown-item.twitter { color: var(--text); }
+.breakdown-item.reddit { color: var(--text); }
 
 /* --- Timeline Feed --- */
 .timeline-feed {
@@ -984,8 +1252,8 @@ onUnmounted(() => {
   top: 24px;
   width: 10px;
   height: 10px;
-  background: #FFF;
-  border: 1px solid #CCC;
+  background: var(--bg2);
+  border: 1px solid var(--border);
   border-radius: 50%;
   transform: translateX(-50%);
   z-index: 2;
@@ -1003,13 +1271,13 @@ onUnmounted(() => {
 
 .timeline-item.twitter .marker-dot { background: #000; }
 .timeline-item.reddit .marker-dot { background: #000; }
-.timeline-item.twitter .timeline-marker { border-color: #000; }
-.timeline-item.reddit .timeline-marker { border-color: #000; }
+.timeline-item.twitter .timeline-marker { border-color: var(--text); }
+.timeline-item.reddit .timeline-marker { border-color: var(--text); }
 
 /* Card Layout */
 .timeline-card {
   width: calc(100% - 48px);
-  background: #FFF;
+  background: var(--bg2);
   border-radius: 2px;
   padding: 16px 20px;
   border: 1px solid #EAEAEA;
@@ -1076,7 +1344,7 @@ onUnmounted(() => {
 .agent-name {
   font-size: 13px;
   font-weight: 600;
-  color: #000;
+  color: var(--text);
 }
 
 .header-meta {
@@ -1086,7 +1354,7 @@ onUnmounted(() => {
 }
 
 .platform-indicator {
-  color: #999;
+  color: var(--text3);
   display: flex;
   align-items: center;
 }
@@ -1102,28 +1370,28 @@ onUnmounted(() => {
 }
 
 /* Monochromatic Badges */
-.badge-post { background: #F0F0F0; color: #333; border-color: #E0E0E0; }
-.badge-comment { background: #F0F0F0; color: #666; border-color: #E0E0E0; }
-.badge-action { background: #FFF; color: #666; border: 1px solid #E0E0E0; }
-.badge-meta { background: #FAFAFA; color: #999; border: 1px dashed #DDD; }
+.badge-post { background: #F0F0F0; color: var(--text); border-color: #E0E0E0; }
+.badge-comment { background: #F0F0F0; color: var(--text2); border-color: #E0E0E0; }
+.badge-action { background: var(--bg2); color: var(--text2); border: 1px solid #E0E0E0; }
+.badge-meta { background: var(--bg3); color: var(--text3); border: 1px dashed #DDD; }
 .badge-idle { opacity: 0.5; }
 
 .content-text {
   font-size: 13px;
   line-height: 1.6;
-  color: #333;
+  color: var(--text);
   margin-bottom: 10px;
 }
 
 .content-text.main-text {
   font-size: 14px;
-  color: #000;
+  color: var(--text);
 }
 
 /* Info Blocks (Quote, Repost, etc) */
 .quoted-block, .repost-content {
   background: #F9F9F9;
-  border: 1px solid #EEE;
+  border: 1px solid var(--border);
   padding: 10px 12px;
   border-radius: 2px;
   margin-top: 8px;
@@ -1137,14 +1405,14 @@ onUnmounted(() => {
   gap: 6px;
   margin-bottom: 6px;
   font-size: 11px;
-  color: #666;
+  color: var(--text2);
 }
 
 .icon-small {
-  color: #999;
+  color: var(--text3);
 }
 .icon-small.filled {
-  color: #999; /* Keep icons neutral unless highlighted */
+  color: var(--text3); /* Keep icons neutral unless highlighted */
 }
 
 .search-query {
@@ -1224,7 +1492,7 @@ onUnmounted(() => {
   padding-bottom: 8px;
   margin-bottom: 8px;
   font-size: 10px;
-  color: #666;
+  color: var(--text2);
 }
 
 .log-content {
@@ -1260,5 +1528,200 @@ onUnmounted(() => {
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin-right: 6px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Secondary action button */
+.action-btn.secondary {
+  background: var(--bg2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.action-btn.secondary:hover:not(:disabled) { background: #F5F5F5; }
+.action-btn.icon-btn {
+  padding: 8px 10px;
+  background: var(--bg3);
+  color: #555;
+  border: 1px solid #E0E0E0;
+}
+.action-btn.icon-btn.active { background: #000; color: #FFF; border-color: var(--text); }
+
+/* ======== Side Panels (ontology + llm log) ======== */
+.side-panel {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: 380px;
+  background: var(--bg2);
+  border-left: 1px solid #E0E0E0;
+  box-shadow: -4px 0 20px rgba(0,0,0,0.08);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.sp-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #E0E0E0;
+  font-size: 11px; font-weight: 700; color: var(--text);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  background: var(--bg3);
+}
+
+.sp-close {
+  background: none; border: none; cursor: pointer;
+  font-size: 18px; color: var(--text3); line-height: 1;
+}
+
+.sp-loading, .sp-empty {
+  padding: 24px 16px; font-size: 12px; color: var(--text3); text-align: center;
+}
+
+.sp-content { flex: 1; overflow-y: auto; padding: 12px 16px; }
+
+/* Ontology */
+.onto-section { margin-bottom: 20px; }
+.onto-section-title {
+  font-size: 10px; font-weight: 700; color: #888;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  margin-bottom: 8px; padding-bottom: 4px;
+  border-bottom: 1px solid #F0F0F0;
+}
+.onto-item { margin-bottom: 10px; }
+.onto-name {
+  display: inline-block; font-size: 12px; font-weight: 600; color: var(--text);
+  background: #F0F0F0; padding: 2px 6px; border-radius: 3px;
+  margin-bottom: 3px;
+}
+.onto-name.edge { background: #E8F0FE; color: #1A56DB; }
+.onto-desc { display: block; font-size: 11px; color: var(--text2); line-height: 1.4; }
+.onto-examples { font-size: 10px; color: var(--text3); margin-top: 2px; }
+
+/* LLM calls */
+.llm-content { padding: 8px; }
+.llm-call-card {
+  border: 1px solid #EAEAEA; border-radius: 4px; margin-bottom: 8px;
+  cursor: pointer; transition: border-color 0.15s;
+  overflow: hidden;
+}
+.llm-call-card:hover { border-color: #CCC; }
+.llm-call-card.expanded { border-color: var(--text); }
+
+.llm-call-header {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  background: var(--bg3);
+}
+.llm-tag {
+  font-size: 9px; font-weight: 700; padding: 2px 6px;
+  background: #000; color: #FFF; border-radius: 2px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.llm-model-tag { font-size: 10px; color: #555; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.llm-time-tag { font-size: 10px; color: #888; }
+.llm-ts { font-size: 10px; color: #BBB; }
+
+.llm-call-body { padding: 10px; border-top: 1px solid #EAEAEA; }
+.llm-msg { margin-bottom: 8px; }
+.llm-role {
+  display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 5px;
+  border-radius: 2px; margin-bottom: 4px; text-transform: uppercase;
+  background: #E8F0FE; color: #1A56DB;
+}
+.llm-msg.system .llm-role { background: #F0F0F0; color: #555; }
+.llm-msg.user .llm-role { background: #FFF3E0; color: #E65100; }
+.response-role { background: #E8F5E9; color: #1B5E20; }
+.llm-response-block { margin-top: 6px; }
+.llm-text {
+  font-size: 11px; line-height: 1.5; color: var(--text);
+  white-space: pre-wrap; word-break: break-word;
+  background: var(--bg3); border: 1px solid #F0F0F0;
+  padding: 6px 8px; border-radius: 3px; margin: 0;
+  max-height: 200px; overflow-y: auto;
+}
+
+/* ======== Rearrange / Pause Panel ======== */
+.rearrange-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); z-index: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+.rearrange-panel {
+  display: flex; flex-direction: column;
+  width: 100%; max-width: 720px; max-height: 90vh; overflow: hidden;
+  border-radius: 6px; box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+}
+
+.rp-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 20px;
+  background: #000; color: #FFF;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase;
+  width: 100%; max-width: 720px; border-radius: 6px 6px 0 0;
+}
+.rp-close { background: none; border: none; color: #FFF; font-size: 20px; cursor: pointer; }
+
+.rp-section {
+  background: var(--bg2); width: 100%; padding: 16px 20px; overflow-y: auto;
+}
+.rp-section-title {
+  font-size: 10px; font-weight: 700; color: #888; text-transform: uppercase;
+  letter-spacing: 0.08em; margin-bottom: 10px;
+}
+
+.inject-row { display: flex; gap: 8px; }
+.inject-input {
+  flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 4px;
+  font-size: 13px; outline: none;
+}
+.inject-input:focus { border-color: var(--text); }
+.inject-btn {
+  padding: 8px 16px; background: #333; color: #FFF; border: none;
+  border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.inject-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.inject-msg { margin-top: 6px; font-size: 11px; color: #1A936F; }
+
+.agent-list { max-height: 260px; overflow-y: auto; }
+.agent-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 0; border-bottom: 1px solid #F5F5F5;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+}
+.ag-rank { font-size: 11px; color: #BBB; min-width: 20px; text-align: right; }
+.ag-info { flex: 1; min-width: 0; }
+.ag-name { font-size: 13px; font-weight: 600; color: var(--text); display: block; }
+.ag-type { font-size: 10px; color: #888; }
+.ag-controls { display: flex; align-items: center; gap: 8px; }
+.ag-label { font-size: 10px; color: var(--text3); white-space: nowrap; }
+.ag-slider { width: 80px; }
+.ag-val { font-size: 11px; color: #555; min-width: 30px; font-family: 'JetBrains Mono', monospace; }
+.ag-select {
+  padding: 3px 6px; border: 1px solid var(--border); border-radius: 3px;
+  font-size: 11px; color: var(--text); background: var(--bg2);
+}
+.ag-order-btns { display: flex; flex-direction: column; gap: 2px; }
+.ag-order-btns button {
+  padding: 2px 6px; border: 1px solid #E0E0E0; border-radius: 2px;
+  background: var(--bg3); font-size: 11px; cursor: pointer; color: #555;
+}
+.ag-order-btns button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.rp-footer {
+  display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px;
+  background: var(--bg3); border-top: 1px solid #E0E0E0;
+  width: 100%;
+}
+.rp-save {
+  padding: 9px 20px; background: #000; color: #FFF; border: none;
+  border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.rp-cancel {
+  padding: 9px 20px; background: var(--bg2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer;
 }
 </style>

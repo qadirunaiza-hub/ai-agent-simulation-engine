@@ -2,16 +2,20 @@ import axios from 'axios'
 
 // Create axios instance
 const service = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001',
+  baseURL: import.meta.env.BASE_URL,
   timeout: 300000, // 5 minute timeout (ontology generation may require longer time)
   headers: {
     'Content-Type': 'application/json'
   }
 })
 
-// Request interceptor
+// Request interceptor — inject auth token
 service.interceptors.request.use(
   config => {
+    const token = localStorage.getItem('mirofish_token')
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`
+    }
     return config
   },
   error => {
@@ -34,14 +38,28 @@ service.interceptors.response.use(
     return res
   },
   error => {
-    console.error('Response error:', error)
+    // Don't intercept 401s from the auth endpoints themselves — let the caller handle them
+    const isAuthEndpoint = error.config?.url?.includes('/api/auth/login') ||
+                           error.config?.url?.includes('/api/auth/register')
 
-    // Handle timeout
+    if (error.response?.status === 401 && !isAuthEndpoint) {
+      localStorage.removeItem('mirofish_token')
+      localStorage.removeItem('mirofish_user')
+      if (window.location.pathname !== '/mirofish/login') {
+        window.location.href = '/mirofish/login'
+      }
+      return Promise.reject(error)
+    }
+
+    // Attach the server's error message to the error so callers can show it
+    if (error.response?.data?.error) {
+      error.serverMessage = error.response.data.error
+    }
+
     if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
       console.error('Request timeout')
     }
 
-    // Handle network error
     if (error.message === 'Network Error') {
       console.error('Network error - please check your connection')
     }

@@ -1,136 +1,154 @@
 <template>
   <div class="home-container">
-    <!-- Top Navigation Bar -->
-    <nav class="navbar" :style="s.navbar">
-      <div class="nav-brand" :style="s.navBrand">MIROFISH OFFLINE</div>
-      <div class="nav-links" :style="s.navLinks">
-        <a href="https://github.com/nikmcfly/MiroFish-Offline" target="_blank" class="github-link" :style="s.githubLink">
-          Visit our Github <span>↗</span>
+    <canvas ref="starCanvas" class="star-bg"></canvas>
+    <div class="orb orb1"></div>
+    <div class="orb orb2"></div>
+    <!-- Navbar -->
+    <nav class="navbar">
+      <div class="nav-brand">
+        MIROFISH <span class="brand-accent">×</span> MU SIGMA
+      </div>
+      <div class="nav-links">
+        <button class="theme-toggle" @click="toggleTheme" :title="isDark ? 'Switch to light' : 'Switch to dark'">
+          {{ isDark ? '☀' : '🌙' }}
+        </button>
+        <span v-if="currentUser" class="user-badge">
+          <span v-if="currentUser.role === 'admin'" class="star">★</span>
+          {{ currentUser.username }}
+        </span>
+        <a href="https://github.com/nikmcfly/MiroFish-Offline" target="_blank" class="github-link">
+          Github <span>↗</span>
         </a>
+        <button @click="handleLogout" class="logout-btn">Sign Out</button>
       </div>
     </nav>
 
-    <div class="main-content" :style="s.mainContent">
-      <!-- Hero Section -->
-      <section class="hero-section" :style="s.heroSection">
-        <div class="hero-left" :style="s.heroLeft">
-          <div class="tag-row" :style="s.tagRow">
-            <span class="orange-tag" :style="s.orangeTag">Offline Multi-Agent Simulation Engine</span>
-            <span class="version-text" :style="s.versionText">/ v0.1-preview</span>
+    <div class="home-inner">
+    <div class="main-content">
+      <!-- Hero -->
+      <section class="hero-section">
+        <div class="hero-left">
+          <div class="tag-row">
+            <span class="neon-tag">Decision Intelligence Platform</span>
+            <span class="version-text">/ Mu Sigma Custom Build</span>
           </div>
 
-          <h1 class="main-title" :style="s.mainTitle">
-            Upload Any Document<br>
-            <span class="gradient-text" :style="s.gradientText">Predict What Happens Next</span>
+          <h1 class="main-title">
+            Upload Any Dataset<br>
+            <span class="gradient-text">Simulate What Happens Next</span>
           </h1>
 
-          <div class="hero-desc" :style="s.heroDesc">
-            <p :style="s.heroDescP">
-              From a single document, <span :style="s.highlightBold">MiroFish Offline</span> extracts reality seeds and builds a parallel world of <span :style="s.highlightOrange">autonomous AI agents</span> — running entirely on your machine. Inject variables, observe emergent behavior, and find <span :style="s.highlightCode">"local optima"</span> in complex social dynamics.
+          <div class="hero-desc">
+            <p>
+              Forked from <span class="hl-brand">MiroFish</span> and customised for <span class="hl-neon">Mu Sigma's</span> Decision Science practice. Extract entity networks from any document, spawn an ecosystem of <span class="hl-neon">autonomous AI agents</span> — each with a distinct persona, memory, and behaviour model — and observe emergent social dynamics before your decisions reach production.
             </p>
-            <p class="slogan-text" :style="s.sloganText">
-              Your data never leaves your machine. The future is simulated locally<span :style="s.blinkingCursor">_</span>
+            <p>
+              Model policy impacts, forecast stakeholder reactions, and find <span class="hl-code">"local optima"</span> in complex organisational dynamics. Built for analysts who think in systems.
+            </p>
+            <p class="slogan-text">
+              All compute runs on Mu Sigma infrastructure. Zero data leaves your environment<span class="blinking-cursor">_</span>
             </p>
           </div>
 
-          <div class="decoration-square" :style="s.decorationSquare"></div>
+          <div class="decoration-square"></div>
         </div>
 
-        <div class="hero-right" :style="s.heroRight">
-          <div class="logo-container" :style="s.logoContainer">
-            <img src="../assets/logo/MiroFish_logo_left.jpeg" alt="MiroFish Logo" :style="s.heroLogo" />
-          </div>
-          <button :style="s.scrollDownBtn" @click="scrollToBottom">↓</button>
+        <div class="hero-right">
+          <canvas ref="simCanvas" class="sim-canvas"></canvas>
         </div>
       </section>
 
-      <!-- Dashboard: Two-Column Layout -->
-      <section class="dashboard-section" :style="s.dashboardSection">
-        <!-- Left Column: Status & Steps -->
-        <div class="left-panel" :style="s.leftPanel">
-          <div class="panel-header" :style="s.panelHeader">
-            <span :style="s.statusDot">■</span> System Status
+      <!-- Dashboard -->
+      <section class="dashboard-section">
+        <div class="left-panel">
+          <div class="panel-header">
+            <span class="status-dot">■</span> System Status
           </div>
-
-          <h2 class="section-title" :style="s.sectionTitle">Ready</h2>
-          <p class="section-desc" :style="s.sectionDesc">
-            Local prediction engine on standby. Upload unstructured data to initialize a simulation.
+          <h2 class="section-title">Ready</h2>
+          <p class="section-desc">
+            Local prediction engine on standby. Upload your data to initialise a simulation run.
           </p>
 
-          <div class="metrics-row" :style="s.metricsRow">
-            <div class="metric-card" :style="s.metricCard">
-              <div class="metric-value" :style="s.metricValue">Free</div>
-              <div class="metric-label" :style="s.metricLabel">Runs on your hardware</div>
+          <div class="metrics-row">
+            <div class="metric-card">
+              <div class="metric-value">Local</div>
+              <div class="metric-label">Runs on your infra</div>
             </div>
-            <div class="metric-card" :style="s.metricCard">
-              <div class="metric-value" :style="s.metricValue">Private</div>
-              <div class="metric-label" :style="s.metricLabel">100% offline, no cloud</div>
+            <div class="metric-card">
+              <div class="metric-value">Private</div>
+              <div class="metric-label">Zero cloud dependency</div>
             </div>
           </div>
 
-          <div class="steps-container" :style="s.stepsContainer">
-            <div class="steps-header" :style="s.stepsHeader">
-               <span :style="s.diamondIcon">◇</span> Workflow Sequence
+          <div class="steps-container">
+            <div class="steps-header">
+              <span class="diamond-icon">◇</span> Workflow Sequence
             </div>
-            <div :style="s.workflowList">
-              <div v-for="(step, i) in steps" :key="i" :style="s.workflowItem">
-                <span :style="s.stepNum">{{ step.num }}</span>
-                <div :style="s.stepInfo">
-                  <div :style="s.stepTitle">{{ step.title }}</div>
-                  <div :style="s.stepDesc">{{ step.desc }}</div>
+            <div class="workflow-list">
+              <div v-for="step in steps" :key="step.num" class="workflow-item">
+                <span class="step-num">{{ step.num }}</span>
+                <div class="step-info">
+                  <div class="step-title">{{ step.title }}</div>
+                  <div class="step-desc">{{ step.desc }}</div>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Right Column: Interactive Console -->
-        <div class="right-panel" :style="s.rightPanel">
-          <div class="console-box" :style="s.consoleBox">
-            <div :style="s.consoleSection">
-              <div class="console-header" :style="s.consoleHeader">
+        <!-- Upload Console -->
+        <div class="right-panel">
+          <div class="console-box">
+            <div class="console-section">
+              <div class="console-header">
                 <span>01 / Reality Seeds</span>
-                <span>Supported: PDF, MD, TXT</span>
+                <span>Supported: PDF, MD, TXT, JSON</span>
               </div>
               <div
-                :style="s.uploadZone"
-                @dragover.prevent="handleDragOver"
-                @dragleave.prevent="handleDragLeave"
+                class="upload-zone"
+                @dragover.prevent="isDragOver = true"
+                @dragleave.prevent="isDragOver = false"
                 @drop.prevent="handleDrop"
                 @click="triggerFileInput"
+                :style="isDragOver ? 'border-color: var(--neon); background: var(--bg2)' : ''"
               >
-                <input ref="fileInput" type="file" multiple accept=".pdf,.md,.txt" @change="handleFileSelect" style="display: none" :disabled="loading" />
-                <div v-if="files.length === 0" :style="s.uploadPlaceholder">
-                  <div :style="s.uploadIcon">↑</div>
-                  <div :style="s.uploadTitle">Drag & drop files here</div>
-                  <div :style="s.uploadHint">or click to browse</div>
+                <input ref="fileInput" type="file" multiple accept=".pdf,.md,.txt,.json" @change="handleFileSelect" style="display:none" :disabled="loading" />
+                <div v-if="files.length === 0" class="upload-placeholder">
+                  <div class="upload-icon">↑</div>
+                  <div class="upload-title">Drag & drop files here</div>
+                  <div class="upload-hint">or click to browse</div>
                 </div>
-                <div v-else :style="s.fileList">
-                  <div v-for="(file, index) in files" :key="index" :style="s.fileItem">
+                <div v-else class="file-list">
+                  <div v-for="(file, i) in files" :key="i" class="file-item">
                     <span>📄</span>
-                    <span :style="s.fileName">{{ file.name }}</span>
-                    <button @click.stop="removeFile(index)" :style="s.removeBtn">×</button>
+                    <span class="file-name">{{ file.name }}</span>
+                    <button @click.stop="files.splice(i, 1)" class="remove-btn">×</button>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div :style="s.consoleDivider"><span :style="s.consoleDividerText">Parameters</span></div>
+            <div class="console-divider"><span>Parameters</span></div>
 
-            <div :style="s.consoleSection">
-              <div class="console-header" :style="s.consoleHeader">
+            <div class="console-section">
+              <div class="console-header">
                 <span>>_ 02 / Simulation Prompt</span>
               </div>
-              <div :style="s.inputWrapper">
-                <textarea v-model="formData.simulationRequirement" :style="s.codeInput" placeholder="// Describe your simulation or prediction goal in natural language" rows="6" :disabled="loading"></textarea>
-                <div :style="s.modelBadge">Engine: Ollama + Neo4j (local)</div>
+              <div class="input-wrapper">
+                <textarea
+                  v-model="simReq"
+                  class="code-input"
+                  placeholder="// Describe your simulation or prediction goal in natural language"
+                  rows="6"
+                  :disabled="loading"
+                ></textarea>
+                <div class="model-badge">Engine: Ollama + Neo4j (local)</div>
               </div>
             </div>
 
-            <div :style="s.btnSection">
-              <button :style="s.startEngineBtn" @click="startSimulation" :disabled="!canSubmit || loading">
-                <span v-if="!loading">Start Engine</span>
-                <span v-else>Initializing...</span>
+            <div class="console-section" style="padding-top:0">
+              <button class="start-engine-btn" @click="startSim" :disabled="!canSubmit || loading">
+                <span>{{ loading ? 'Initialising…' : 'Start Engine' }}</span>
                 <span>→</span>
               </button>
             </div>
@@ -140,127 +158,159 @@
 
       <HistoryDatabase />
     </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import HistoryDatabase from '../components/HistoryDatabase.vue'
-
-const mono = 'JetBrains Mono, monospace'
-const sans = 'Space Grotesk, Noto Sans SC, system-ui, sans-serif'
-
-const s = reactive({
-  navbar: { height: '60px', background: '#000', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 40px' },
-  navBrand: { fontFamily: mono, fontWeight: '800', letterSpacing: '1px', fontSize: '1.2rem' },
-  navLinks: { display: 'flex', alignItems: 'center' },
-  githubLink: { color: '#fff', textDecoration: 'none', fontFamily: mono, fontSize: '0.9rem', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px' },
-  mainContent: { maxWidth: '1400px', margin: '0 auto', padding: '60px 40px' },
-  heroSection: { display: 'flex', justifyContent: 'space-between', marginBottom: '80px', position: 'relative' },
-  heroLeft: { flex: '1', paddingRight: '60px' },
-  tagRow: { display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '25px', fontFamily: mono, fontSize: '0.8rem' },
-  orangeTag: { background: '#FF4500', color: '#fff', padding: '4px 10px', fontWeight: '700', letterSpacing: '1px', fontSize: '0.75rem' },
-  versionText: { color: '#999', fontWeight: '500', letterSpacing: '0.5px' },
-  mainTitle: { fontSize: '4.5rem', lineHeight: '1.2', fontWeight: '500', margin: '0 0 40px 0', letterSpacing: '-2px', color: '#000' },
-  gradientText: { background: 'linear-gradient(90deg, #000 0%, #444 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', display: 'inline-block' },
-  heroDesc: { fontSize: '1.05rem', lineHeight: '1.8', color: '#666', maxWidth: '640px', marginBottom: '50px', fontWeight: '400', textAlign: 'justify' },
-  heroDescP: { marginBottom: '1.5rem' },
-  highlightBold: { color: '#000', fontWeight: '700' },
-  highlightOrange: { color: '#FF4500', fontWeight: '700', fontFamily: mono },
-  highlightCode: { background: 'rgba(0,0,0,0.05)', padding: '2px 6px', borderRadius: '2px', fontFamily: mono, fontSize: '0.9em', color: '#000', fontWeight: '600' },
-  sloganText: { fontSize: '1.2rem', fontWeight: '520', color: '#000', letterSpacing: '1px', borderLeft: '3px solid #FF4500', paddingLeft: '15px', marginTop: '20px' },
-  blinkingCursor: { color: '#FF4500', fontWeight: '700' },
-  decorationSquare: { width: '16px', height: '16px', background: '#FF4500' },
-  heroRight: { flex: '0.8', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end' },
-  logoContainer: { width: '100%', display: 'flex', justifyContent: 'flex-end', paddingRight: '40px' },
-  heroLogo: { maxWidth: '500px', width: '100%' },
-  scrollDownBtn: { width: '40px', height: '40px', border: '1px solid #E5E5E5', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#FF4500', fontSize: '1.2rem' },
-  dashboardSection: { display: 'flex', gap: '60px', borderTop: '1px solid #E5E5E5', paddingTop: '60px', alignItems: 'flex-start' },
-  leftPanel: { flex: '0.8', display: 'flex', flexDirection: 'column' },
-  panelHeader: { fontFamily: mono, fontSize: '0.8rem', color: '#999', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' },
-  statusDot: { color: '#FF4500', fontSize: '0.8rem' },
-  sectionTitle: { fontSize: '2rem', fontWeight: '520', margin: '0 0 15px 0' },
-  sectionDesc: { color: '#666', marginBottom: '25px', lineHeight: '1.6' },
-  metricsRow: { display: 'flex', gap: '20px', marginBottom: '15px' },
-  metricCard: { border: '1px solid #E5E5E5', padding: '20px 30px', minWidth: '150px' },
-  metricValue: { fontFamily: mono, fontSize: '1.8rem', fontWeight: '520', marginBottom: '5px' },
-  metricLabel: { fontSize: '0.85rem', color: '#999' },
-  stepsContainer: { border: '1px solid #E5E5E5', padding: '30px', position: 'relative' },
-  stepsHeader: { fontFamily: mono, fontSize: '0.8rem', color: '#999', marginBottom: '25px', display: 'flex', alignItems: 'center', gap: '8px' },
-  diamondIcon: { fontSize: '1.2rem', lineHeight: '1' },
-  workflowList: { display: 'flex', flexDirection: 'column', gap: '20px' },
-  workflowItem: { display: 'flex', alignItems: 'flex-start', gap: '20px' },
-  stepNum: { fontFamily: mono, fontWeight: '700', color: '#000', opacity: '0.3' },
-  stepInfo: { flex: '1' },
-  stepTitle: { fontWeight: '520', fontSize: '1rem', marginBottom: '4px' },
-  stepDesc: { fontSize: '0.85rem', color: '#666' },
-  rightPanel: { flex: '1.2', display: 'flex', flexDirection: 'column' },
-  consoleBox: { border: '1px solid #CCC', padding: '8px' },
-  consoleSection: { padding: '20px' },
-  consoleHeader: { display: 'flex', justifyContent: 'space-between', marginBottom: '15px', fontFamily: mono, fontSize: '0.75rem', color: '#666' },
-  uploadZone: { border: '1px dashed #CCC', height: '200px', overflowY: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#FAFAFA' },
-  uploadPlaceholder: { textAlign: 'center' },
-  uploadIcon: { width: '40px', height: '40px', border: '1px solid #DDD', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 15px', color: '#999' },
-  uploadTitle: { fontWeight: '500', fontSize: '0.9rem', marginBottom: '5px' },
-  uploadHint: { fontFamily: mono, fontSize: '0.75rem', color: '#999' },
-  fileList: { width: '100%', padding: '15px', display: 'flex', flexDirection: 'column', gap: '10px' },
-  fileItem: { display: 'flex', alignItems: 'center', background: '#fff', padding: '8px 12px', border: '1px solid #EEE', fontFamily: mono, fontSize: '0.85rem' },
-  fileName: { flex: '1', margin: '0 10px' },
-  removeBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: '#999' },
-  consoleDivider: { display: 'flex', alignItems: 'center', margin: '10px 0', borderTop: '1px solid #EEE' },
-  consoleDividerText: { padding: '0 15px', fontFamily: mono, fontSize: '0.7rem', color: '#BBB', letterSpacing: '1px' },
-  inputWrapper: { position: 'relative', border: '1px solid #DDD', background: '#FAFAFA' },
-  codeInput: { width: '100%', border: 'none', background: 'transparent', padding: '20px', fontFamily: mono, fontSize: '0.9rem', lineHeight: '1.6', resize: 'vertical', outline: 'none', minHeight: '150px' },
-  modelBadge: { position: 'absolute', bottom: '10px', right: '15px', fontFamily: mono, fontSize: '0.7rem', color: '#AAA' },
-  btnSection: { padding: '0 20px 20px' },
-  startEngineBtn: { width: '100%', background: '#000', color: '#fff', border: 'none', padding: '20px', fontFamily: mono, fontWeight: '700', fontSize: '1.1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', letterSpacing: '1px' },
-})
-
-const steps = [
-  { num: '01', title: 'Graph Build', desc: 'Extract reality seeds from your document, build knowledge graph with Neo4j + GraphRAG' },
-  { num: '02', title: 'Env Setup', desc: 'Generate agent personas, configure simulation parameters via local Ollama LLM' },
-  { num: '03', title: 'Simulation', desc: 'Run multi-agent simulation locally with dynamic memory updates and emergent behavior' },
-  { num: '04', title: 'Report', desc: 'ReportAgent analyzes the simulation results and generates a detailed prediction report' },
-  { num: '05', title: 'Interaction', desc: 'Chat with any agent from the simulated world or discuss findings with ReportAgent' },
-]
+import { setPendingUpload } from '../store/pendingUpload'
+import { currentUser, clearAuth } from '../store/auth'
+import { isDark, toggleTheme } from '../store/theme'
+import { logout as apiLogout } from '../api/auth'
 
 const router = useRouter()
-
-const formData = ref({ simulationRequirement: '' })
 const files = ref([])
+const simReq = ref('')
 const loading = ref(false)
-const error = ref('')
 const isDragOver = ref(false)
 const fileInput = ref(null)
+const starCanvas = ref(null)
+const simCanvas = ref(null)
 
-const canSubmit = computed(() => {
-  return formData.value.simulationRequirement.trim() !== '' && files.value.length > 0
+onMounted(() => {
+  // --- Network simulation canvas ---
+  const sim = simCanvas.value
+  if (sim) {
+    const sc = sim.getContext('2d')
+    const rsim = () => { const r = sim.getBoundingClientRect(); sim.width = r.width || sim.offsetWidth; sim.height = r.height || sim.offsetHeight }
+    rsim()
+    window.addEventListener('resize', rsim)
+    const nodes = Array.from({ length: 22 }, () => ({
+      x: Math.random(), y: Math.random(),
+      vx: (Math.random() - 0.5) * 0.0003, vy: (Math.random() - 0.5) * 0.0003,
+      r: Math.random() * 3 + 2, phase: Math.random() * Math.PI * 2,
+      spd: Math.random() * 0.015 + 0.008
+    }))
+    const parts = []
+    const drawSim = () => {
+      const W = sim.width, H = sim.height
+      sc.clearRect(0, 0, W, H)
+      nodes.forEach(n => {
+        n.x += n.vx; n.y += n.vy; n.phase += n.spd
+        if (n.x < 0.05 || n.x > 0.95) n.vx *= -1
+        if (n.y < 0.05 || n.y > 0.95) n.vy *= -1
+      })
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const dx = (nodes[i].x - nodes[j].x) * W, dy = (nodes[i].y - nodes[j].y) * H
+          const d = Math.sqrt(dx*dx + dy*dy)
+          if (d < 140) {
+            sc.beginPath(); sc.moveTo(nodes[i].x*W, nodes[i].y*H); sc.lineTo(nodes[j].x*W, nodes[j].y*H)
+            sc.strokeStyle = `rgba(249,115,22,${(1-d/140)*0.22})`; sc.lineWidth = 1; sc.stroke()
+            if (Math.random() < 0.0008) parts.push({ a:i, b:j, t:0, spd: Math.random()*0.004+0.002 })
+          }
+        }
+      }
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const p = parts[i]; p.t += p.spd
+        if (p.t >= 1) { parts.splice(i,1); continue }
+        const na = nodes[p.a], nb = nodes[p.b]
+        sc.beginPath(); sc.arc((na.x+(nb.x-na.x)*p.t)*W, (na.y+(nb.y-na.y)*p.t)*H, 2, 0, Math.PI*2)
+        sc.fillStyle = `rgba(249,115,22,${0.9-p.t*0.5})`; sc.fill()
+      }
+      nodes.forEach(n => {
+        const pulse = 0.6 + 0.4 * Math.sin(n.phase)
+        const g = sc.createRadialGradient(n.x*W, n.y*H, 0, n.x*W, n.y*H, n.r*4)
+        g.addColorStop(0, `rgba(249,115,22,${0.85*pulse})`); g.addColorStop(1, 'rgba(249,115,22,0)')
+        sc.beginPath(); sc.arc(n.x*W, n.y*H, n.r*4, 0, Math.PI*2); sc.fillStyle = g; sc.fill()
+        sc.beginPath(); sc.arc(n.x*W, n.y*H, n.r, 0, Math.PI*2)
+        sc.fillStyle = `rgba(255,200,100,${pulse})`; sc.fill()
+      })
+
+      // Center text
+      const t = performance.now() / 1000
+      const textPulse = 0.7 + 0.3 * Math.sin(t * 1.2)
+      const cx = W / 2, cy = H / 2
+      sc.save()
+      sc.textAlign = 'center'
+      sc.textBaseline = 'middle'
+      // Glow
+      sc.shadowColor = `rgba(255,255,255,${0.6 * textPulse})`
+      sc.shadowBlur = 30
+      sc.font = `900 ${Math.max(22, W * 0.095)}px "JetBrains Mono", monospace`
+      sc.fillStyle = `rgba(255,255,255,${textPulse})`
+      sc.fillText('MIROFISH', cx, cy - W * 0.032)
+      sc.shadowBlur = 0
+      sc.font = `500 ${Math.max(9, W * 0.032)}px "JetBrains Mono", monospace`
+      sc.fillStyle = `rgba(255,255,255,${0.45 * textPulse})`
+      sc.fillText('v26.06.04', cx, cy + W * 0.036)
+      sc.font = `400 ${Math.max(8, W * 0.026)}px "Space Grotesk", sans-serif`
+      sc.fillStyle = `rgba(255,255,255,${0.28 * textPulse})`
+      sc.fillText('Customized for Mu Sigma Operations..', cx, cy + W * 0.088)
+      sc.restore()
+
+      requestAnimationFrame(drawSim)
+    }
+    drawSim()
+  }
+
+  // --- Star canvas ---
+  const canvas = starCanvas.value
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  const stars = []
+  const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight }
+  resize()
+  window.addEventListener('resize', resize)
+  for (let s = 0; s < 180; s++) {
+    stars.push({ x: Math.random(), y: Math.random(), r: Math.random() * 1.2 + 0.2, o: Math.random() * 0.5 + 0.1, d: Math.random() * 0.003 + 0.001 })
+  }
+  const draw = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    stars.forEach(s => {
+      s.o += s.d; if (s.o > 0.6 || s.o < 0.1) s.d *= -1
+      ctx.beginPath(); ctx.arc(s.x * canvas.width, s.y * canvas.height, s.r, 0, Math.PI * 2)
+      ctx.fillStyle = `rgba(255,255,255,${s.o})`; ctx.fill()
+    })
+    requestAnimationFrame(draw)
+  }
+  draw()
 })
 
+const canSubmit = computed(() => simReq.value.trim() !== '' && files.value.length > 0)
+
 const triggerFileInput = () => { if (!loading.value) fileInput.value?.click() }
-const handleFileSelect = (event) => { addFiles(Array.from(event.target.files)) }
-const handleDragOver = (e) => { isDragOver.value = true }
-const handleDragLeave = (e) => { isDragOver.value = false }
+const handleFileSelect = (e) => addFiles(Array.from(e.target.files))
 const handleDrop = (e) => { isDragOver.value = false; addFiles(Array.from(e.dataTransfer.files)) }
 
 const addFiles = (newFiles) => {
-  const allowed = ['.pdf', '.md', '.txt']
+  const allowed = ['.pdf', '.md', '.txt', '.json']
   const valid = newFiles.filter(f => allowed.some(ext => f.name.toLowerCase().endsWith(ext)))
   files.value = [...files.value, ...valid]
 }
 
-const removeFile = (index) => { files.value.splice(index, 1) }
+const scrollToBottom = () => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
 
-const scrollToBottom = () => { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }) }
-
-const startSimulation = () => {
+const startSim = () => {
   if (!canSubmit.value || loading.value) return
-  import('../store/pendingUpload.js').then(({ setPendingUpload }) => {
-    setPendingUpload(files.value, formData.value.simulationRequirement)
-    router.push({ name: 'Process', params: { projectId: 'new' } })
-  })
+  setPendingUpload(files.value, simReq.value)
+  router.push({ name: 'Process', params: { projectId: 'new' } })
 }
-</script>
 
-<!-- Styles loaded from Home.css via import -->
+const handleLogout = async () => {
+  try { await apiLogout() } catch (_) {}
+  clearAuth()
+  router.push({ name: 'Login' })
+}
+
+const steps = [
+  { num: '01', title: 'Knowledge Graph', desc: 'Extract entity networks from your documents using Neo4j + GraphRAG' },
+  { num: '02', title: 'Agent Configuration', desc: 'Generate AI personas from graph entities via local Ollama LLM' },
+  { num: '03', title: 'Simulation', desc: 'Run multi-agent social dynamics locally with emergent behaviour tracking' },
+  { num: '04', title: 'Analysis Report', desc: 'AI-generated strategic insights from simulation output' },
+  { num: '05', title: 'Deep Interaction', desc: 'Interview any simulated agent to probe reasoning and perspectives' },
+]
+</script>

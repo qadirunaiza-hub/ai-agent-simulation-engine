@@ -73,7 +73,11 @@ class SimulationState:
     
     # Error message
     error: Optional[str] = None
-    
+
+    # Ownership / archive
+    owner_user_id: Optional[str] = None
+    archived: bool = False
+
     def to_dict(self) -> Dict[str, Any]:
         """Complete status dict (internal use)"""
         return {
@@ -94,6 +98,8 @@ class SimulationState:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "error": self.error,
+            "owner_user_id": self.owner_user_id,
+            "archived": self.archived,
         }
     
     def to_simple_dict(self) -> Dict[str, Any]:
@@ -185,6 +191,8 @@ class SimulationManager:
             created_at=data.get("created_at", datetime.now().isoformat()),
             updated_at=data.get("updated_at", datetime.now().isoformat()),
             error=data.get("error"),
+            owner_user_id=data.get("owner_user_id"),
+            archived=data.get("archived", False),
         )
         
         self._simulations[simulation_id] = state
@@ -196,22 +204,24 @@ class SimulationManager:
         graph_id: str,
         enable_twitter: bool = True,
         enable_reddit: bool = True,
+        owner_user_id: Optional[str] = None,
     ) -> SimulationState:
         """
         Create new simulation
-        
+
         Args:
             project_id: Project ID
             graph_id: Graph ID
             enable_twitter: Whether to enable Twitter simulation
             enable_reddit: Whether to enable Reddit simulation
-            
+            owner_user_id: User ID of the simulation owner
+
         Returns:
             SimulationState
         """
         import uuid
         simulation_id = f"sim_{uuid.uuid4().hex[:12]}"
-        
+
         state = SimulationState(
             simulation_id=simulation_id,
             project_id=project_id,
@@ -219,11 +229,13 @@ class SimulationManager:
             enable_twitter=enable_twitter,
             enable_reddit=enable_reddit,
             status=SimulationStatus.CREATED,
+            owner_user_id=owner_user_id,
+            archived=False,
         )
-        
+
         self._save_simulation_state(state)
-        logger.info(f"Create simulation: {simulation_id}, project={project_id}, graph={graph_id}")
-        
+        logger.info(f"Create simulation: {simulation_id}, project={project_id}, graph={graph_id}, owner={owner_user_id}")
+
         return state
     
     def prepare_simulation(

@@ -35,3 +35,7 @@ python-dotenv>=1.0.0
 
 # 数据验证
 pydantic>=2.0.0
+
+# ============= Knowledge Graph (Graphiti branch) =============
+# Temporal knowledge graph framework by Zep — used in feature/graphiti branch
+# graphiti-core>=0.29.0

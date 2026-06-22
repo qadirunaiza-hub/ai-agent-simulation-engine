@@ -169,7 +169,7 @@ class GraphBuilderService:
         """Create graph"""
         return self.storage.create_graph(
             name=name,
-            description="MiroFish Social Simulation Graph"
+            description="MiroFish Knowledge Graph"
         )
 
     def set_ontology(self, graph_id: str, ontology: Dict[str, Any]):

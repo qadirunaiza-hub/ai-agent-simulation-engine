@@ -1,6 +1,7 @@
 """
 Ontology generation service
-Interface 1: Analyze text content and generate entity and relationship type definitions suitable for social simulation
+Analyzes document content and derives a domain-appropriate ontology
+for knowledge graph construction — domain-agnostic, not locked to social simulation.
 """
 
 import json
@@ -8,150 +9,79 @@ from typing import Dict, Any, List, Optional
 from ..utils.llm_client import LLMClient
 
 
-# System prompt for ontology generation
-ONTOLOGY_SYSTEM_PROMPT = """You are a professional knowledge graph ontology design expert. Your task is to analyze given text content and simulation requirements, and design entity types and relationship types suitable for **social media opinion simulation**.
+ONTOLOGY_SYSTEM_PROMPT = """You are a knowledge graph ontology expert. Your task is to read the provided text and derive entity types and relationship types that are NATIVE to that domain — do not impose a fixed schema, discover what the text is actually about.
 
-**Important: You must output valid JSON format data, do not output anything else.**
+**Output only valid JSON. No explanation, no markdown fences.**
 
-## Core Task Background
+## Step 1 — Identify the Domain
 
-We are building a **social media opinion simulation system**. In this system:
-- Each entity is an "account" or "subject" that can voice, interact, and spread information on social media
-- Entities influence each other, retweet, comment, and respond
-- We need to simulate the reactions of various parties in opinion events and information dissemination paths
+Read the text and determine what domain it belongs to. Examples:
+- Business / Corporate: companies, products, executives, markets, deals
+- Legal / Compliance: contracts, parties, clauses, obligations, jurisdictions
+- Scientific / Research: papers, authors, institutions, concepts, experiments
+- Medical / Clinical: patients, conditions, treatments, drugs, providers
+- Technology / Engineering: systems, components, APIs, teams, dependencies
+- Financial: instruments, transactions, issuers, portfolios, regulations
+- Narrative / News: events, actors, locations, organisations, dates
+- Any other domain — let the text guide you
 
-Therefore, **entities must be real-world entities that can voice and interact on social media**:
+## Step 2 — Design Entity Types
 
-**Can be**:
-- Specific individuals (public figures, stakeholders, opinion leaders, experts, ordinary people)
-- Companies and enterprises (including their official accounts)
-- Organizations (universities, associations, NGOs, unions, etc.)
-- Government departments and regulatory agencies
-- Media institutions (newspapers, TV stations, self-media, websites)
-- Social media platforms themselves
-- Specific group representatives (such as alumni associations, fan groups, rights protection groups, etc.)
+Rules:
+- **6 to 10 entity types** — not more, not fewer than what the domain needs
+- Types must be **concrete, nameable things** present in the text (not abstract concepts, not adjectives, not topics)
+- Last 2 types MUST always be the universal fallbacks:
+  - `Person` — any natural person not covered by a more specific type
+  - `Organization` — any organisation not covered by a more specific type
+- First 4–8 types are **domain-specific**, derived from what the text is actually about
+- Each type needs 1–3 attributes (avoid reserved words: `name`, `uuid`, `group_id`, `created_at`, `summary`)
 
-**Cannot be**:
-- Abstract concepts (such as "public opinion", "emotion", "trend")
-- Topics/subjects (such as "academic integrity", "education reform")
-- Views/attitudes (such as "supporters", "opponents")
+## Step 3 — Design Relationship Types
+
+Rules:
+- **5 to 10 relationship types**
+- Names: UPPER_SNAKE_CASE verbs that describe how one entity acts on or relates to another
+- Each must list valid source → target entity type pairs
+- Relationships must be grounded in what the text describes, not generic fillers
 
 ## Output Format
 
-Please output JSON format with the following structure:
-
 ```json
 {
+    "domain": "detected domain label (e.g. Business, Legal, Medical, Technology, Research, News)",
     "entity_types": [
         {
-            "name": "Entity type name (English, PascalCase)",
-            "description": "Brief description (English, no more than 100 characters)",
+            "name": "PascalCase type name",
+            "description": "One sentence, max 100 chars",
             "attributes": [
-                {
-                    "name": "Attribute name (English, snake_case)",
-                    "type": "text",
-                    "description": "Attribute description"
-                }
+                {"name": "snake_case_attr", "type": "text", "description": "what it captures"}
             ],
-            "examples": ["Example entity 1", "Example entity 2"]
+            "examples": ["example 1", "example 2"]
         }
     ],
     "edge_types": [
         {
-            "name": "Relationship type name (English, UPPER_SNAKE_CASE)",
-            "description": "Brief description (English, no more than 100 characters)",
+            "name": "UPPER_SNAKE_CASE",
+            "description": "One sentence, max 100 chars",
             "source_targets": [
-                {"source": "Source entity type", "target": "Target entity type"}
+                {"source": "SourceType", "target": "TargetType"}
             ],
             "attributes": []
         }
     ],
-    "analysis_summary": "Brief analysis and explanation of text content"
+    "analysis_summary": "2–3 sentences: what this document is about and why these types were chosen"
 }
 ```
 
-## Design Guidelines (Extremely Important!)
+## Quality Checklist (verify before outputting)
 
-### 1. Entity Type Design - Must Strictly Follow
-
-**Quantity requirement: Must have exactly 10 entity types**
-
-**Hierarchical structure requirement (must include both specific types and fallback types)**:
-
-Your 10 entity types must include the following hierarchy:
-
-A. **Fallback types (must include, place in last 2 of list)**:
-   - `Person`: Fallback type for any natural person. When a person does not fit other more specific person types, use this.
-   - `Organization`: Fallback type for any organization. When an organization does not fit other more specific organization types, use this.
-
-B. **Specific types (8, designed based on text content)**:
-   - Design more specific types for main characters appearing in the text
-   - Example: If text involves academic events, can have `Student`, `Professor`, `University`
-   - Example: If text involves business events, can have `Company`, `CEO`, `Employee`
-
-**Why fallback types are needed**:
-- Various people will appear in the text, such as "primary/secondary teachers", "random person", "some netizen"
-- If no specific type matches, they should be classified as `Person`
-- Similarly, small organizations and temporary groups should be classified as `Organization`
-
-**Design principles for specific types**:
-- Identify high-frequency or key role types from the text
-- Each specific type should have clear boundaries, avoid overlap
-- Description must clearly explain the difference between this type and the fallback type
-
-### 2. Relationship Type Design
-
-- Quantity: 6-10
-- Relationships should reflect real connections in social media interactions
-- Ensure relationship source_targets cover your defined entity types
-
-### 3. Attribute Design
-
-- 1-3 key attributes per entity type
-- **Note**: Attribute names cannot use `name`, `uuid`, `group_id`, `created_at`, `summary` (these are system reserved words)
-- Recommended: `full_name`, `title`, `role`, `position`, `location`, `description`, etc.
-
-## Entity Type Reference
-
-**Individual types (specific)**:
-- Student: Student
-- Professor: Professor/Scholar
-- Journalist: Journalist
-- Celebrity: Celebrity/Internet celebrity
-- Executive: Executive
-- Official: Government official
-- Lawyer: Lawyer
-- Doctor: Doctor
-
-**Individual types (fallback)**:
-- Person: Any natural person (use when not fitting other specific types)
-
-**Organization types (specific)**:
-- University: University
-- Company: Company/Enterprise
-- GovernmentAgency: Government agency
-- MediaOutlet: Media institution
-- Hospital: Hospital
-- School: Primary/Secondary school
-- NGO: Non-governmental organization
-
-**Organization types (fallback)**:
-- Organization: Any organization (use when not fitting other specific types)
-
-## Relationship Type Reference
-
-- WORKS_FOR: Works for
-- STUDIES_AT: Studies at
-- AFFILIATED_WITH: Affiliated with
-- REPRESENTS: Represents
-- REGULATES: Regulates
-- REPORTS_ON: Reports on
-- COMMENTS_ON: Comments on
-- RESPONDS_TO: Responds to
-- SUPPORTS: Supports
-- OPPOSES: Opposes
-- COLLABORATES_WITH: Collaborates with
-- COMPETES_WITH: Competes with
+- [ ] Entity types are concrete things, not abstract concepts
+- [ ] Last 2 types are Person and Organization (in that order)
+- [ ] No duplicate or overlapping types
+- [ ] Every edge type has at least one valid source_target pair using defined entity types
+- [ ] Attribute names avoid reserved words: name, uuid, group_id, created_at, summary
+- [ ] Total entity types: 6–10
+- [ ] Total edge types: 5–10
 """
 
 
@@ -167,180 +97,132 @@ class OntologyGenerator:
     def generate(
         self,
         document_texts: List[str],
-        simulation_requirement: str,
+        simulation_requirement: str = "",
         additional_context: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Generate ontology definition
+        Generate a domain-appropriate ontology from document content.
 
         Args:
-            document_texts: List of document texts
-            simulation_requirement: Description of simulation requirements
-            additional_context: Additional context
+            document_texts: List of document texts to analyse
+            simulation_requirement: Optional user hint about the domain or use-case
+            additional_context: Any additional context to guide generation
 
         Returns:
-            Ontology definition (entity_types, edge_types, etc.)
+            Ontology dict with entity_types, edge_types, domain, analysis_summary
         """
-        # Build user message
         user_message = self._build_user_message(
             document_texts,
             simulation_requirement,
-            additional_context
+            additional_context,
         )
 
         messages = [
             {"role": "system", "content": ONTOLOGY_SYSTEM_PROMPT},
-            {"role": "user", "content": user_message}
+            {"role": "user", "content": user_message},
         ]
 
-        # Call LLM
         result = self.llm_client.chat_json(
             messages=messages,
             temperature=0.3,
-            max_tokens=4096
+            max_tokens=4096,
         )
 
-        # Validate and post-process
-        result = self._validate_and_process(result)
+        return self._validate_and_process(result)
 
-        return result
-
-    # Maximum text length for LLM (50,000 characters)
     MAX_TEXT_LENGTH_FOR_LLM = 50000
 
     def _build_user_message(
         self,
         document_texts: List[str],
-        simulation_requirement: str,
-        additional_context: Optional[str]
+        user_hint: str,
+        additional_context: Optional[str],
     ) -> str:
-        """Build user message"""
-
-        # Combine texts
         combined_text = "\n\n---\n\n".join(document_texts)
         original_length = len(combined_text)
 
-        # If text exceeds 50,000 characters, truncate (only affects LLM input, not graph construction)
         if len(combined_text) > self.MAX_TEXT_LENGTH_FOR_LLM:
-            combined_text = combined_text[:self.MAX_TEXT_LENGTH_FOR_LLM]
-            combined_text += f"\n\n...(Original text has {original_length} characters, first {self.MAX_TEXT_LENGTH_FOR_LLM} characters extracted for ontology analysis)..."
+            combined_text = combined_text[: self.MAX_TEXT_LENGTH_FOR_LLM]
+            combined_text += (
+                f"\n\n...(truncated — original {original_length} chars, "
+                f"first {self.MAX_TEXT_LENGTH_FOR_LLM} shown for ontology analysis)..."
+            )
 
-        message = f"""## Simulation Requirements
+        parts = ["## Document Content\n", combined_text]
 
-{simulation_requirement}
+        if user_hint and user_hint.strip():
+            parts += ["\n## User Hint / Use-case\n", user_hint.strip()]
 
-## Document Content
+        if additional_context and additional_context.strip():
+            parts += ["\n## Additional Context\n", additional_context.strip()]
 
-{combined_text}
-"""
+        parts.append(
+            "\n\nAnalyse the document above and output an ontology JSON "
+            "that reflects the actual domain and entities present in this text."
+        )
 
-        if additional_context:
-            message += f"""
-## Additional Explanation
-
-{additional_context}
-"""
-
-        message += """
-Based on the above content, design entity types and relationship types suitable for social opinion simulation.
-
-**Rules to follow**:
-1. Must output exactly 10 entity types
-2. Last 2 must be fallback types: Person (individual fallback) and Organization (organization fallback)
-3. First 8 are specific types designed based on text content
-4. All entity types must be real-world subjects that can voice opinions, not abstract concepts
-5. Attribute names cannot use reserved words like name, uuid, group_id, use full_name, org_name, etc. instead
-"""
-
-        return message
+        return "\n".join(parts)
     
     def _validate_and_process(self, result: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate and post-process result"""
-
-        # Ensure necessary fields exist
-        if "entity_types" not in result:
-            result["entity_types"] = []
-        if "edge_types" not in result:
-            result["edge_types"] = []
-        if "analysis_summary" not in result:
-            result["analysis_summary"] = ""
-
-        # Validate entity types
-        for entity in result["entity_types"]:
-            if "attributes" not in entity:
-                entity["attributes"] = []
-            if "examples" not in entity:
-                entity["examples"] = []
-            # Ensure description doesn't exceed 100 characters
-            if len(entity.get("description", "")) > 100:
-                entity["description"] = entity["description"][:97] + "..."
-
-        # Validate relationship types
-        for edge in result["edge_types"]:
-            if "source_targets" not in edge:
-                edge["source_targets"] = []
-            if "attributes" not in edge:
-                edge["attributes"] = []
-            if len(edge.get("description", "")) > 100:
-                edge["description"] = edge["description"][:97] + "..."
-
-        # Zep API limit: maximum 10 custom entity types, maximum 10 custom edge types
+        """Normalise LLM output and guarantee universal fallback types are present."""
         MAX_ENTITY_TYPES = 10
         MAX_EDGE_TYPES = 10
 
-        # Fallback type definitions
-        person_fallback = {
+        result.setdefault("entity_types", [])
+        result.setdefault("edge_types", [])
+        result.setdefault("analysis_summary", "")
+        result.setdefault("domain", "General")
+
+        for entity in result["entity_types"]:
+            entity.setdefault("attributes", [])
+            entity.setdefault("examples", [])
+            if len(entity.get("description", "")) > 100:
+                entity["description"] = entity["description"][:97] + "..."
+
+        for edge in result["edge_types"]:
+            edge.setdefault("source_targets", [])
+            edge.setdefault("attributes", [])
+            if len(edge.get("description", "")) > 100:
+                edge["description"] = edge["description"][:97] + "..."
+
+        # Universal fallbacks — always present as last two entries
+        _PERSON_FALLBACK = {
             "name": "Person",
-            "description": "Any individual person not fitting other specific person types.",
+            "description": "Any individual person not covered by a more specific type.",
             "attributes": [
-                {"name": "full_name", "type": "text", "description": "Full name of the person"},
-                {"name": "role", "type": "text", "description": "Role or occupation"}
+                {"name": "full_name", "type": "text", "description": "Full name"},
+                {"name": "role", "type": "text", "description": "Role or occupation"},
             ],
-            "examples": ["ordinary citizen", "anonymous netizen"]
+            "examples": ["individual", "unnamed person"],
         }
-
-        organization_fallback = {
+        _ORG_FALLBACK = {
             "name": "Organization",
-            "description": "Any organization not fitting other specific organization types.",
+            "description": "Any organisation not covered by a more specific type.",
             "attributes": [
-                {"name": "org_name", "type": "text", "description": "Name of the organization"},
-                {"name": "org_type", "type": "text", "description": "Type of organization"}
+                {"name": "org_name", "type": "text", "description": "Organisation name"},
+                {"name": "org_type", "type": "text", "description": "Type of organisation"},
             ],
-            "examples": ["small business", "community group"]
+            "examples": ["small business", "community group"],
         }
 
-        # Check if fallback types already exist
-        entity_names = {e["name"] for e in result["entity_types"]}
-        has_person = "Person" in entity_names
-        has_organization = "Organization" in entity_names
+        existing_names = {e["name"] for e in result["entity_types"]}
+        fallbacks_needed = []
+        if "Person" not in existing_names:
+            fallbacks_needed.append(_PERSON_FALLBACK)
+        if "Organization" not in existing_names:
+            fallbacks_needed.append(_ORG_FALLBACK)
 
-        # Fallback types to add
-        fallbacks_to_add = []
-        if not has_person:
-            fallbacks_to_add.append(person_fallback)
-        if not has_organization:
-            fallbacks_to_add.append(organization_fallback)
+        if fallbacks_needed:
+            slots_available = MAX_ENTITY_TYPES - len(result["entity_types"])
+            if slots_available < len(fallbacks_needed):
+                # Trim from the end of specific types to make room
+                trim = len(fallbacks_needed) - slots_available
+                result["entity_types"] = result["entity_types"][:-trim]
+            result["entity_types"].extend(fallbacks_needed)
 
-        if fallbacks_to_add:
-            current_count = len(result["entity_types"])
-            needed_slots = len(fallbacks_to_add)
-
-            # If adding would exceed 10, need to remove some existing types
-            if current_count + needed_slots > MAX_ENTITY_TYPES:
-                # Calculate how many to remove
-                to_remove = current_count + needed_slots - MAX_ENTITY_TYPES
-                # Remove from end (keep more important specific types in front)
-                result["entity_types"] = result["entity_types"][:-to_remove]
-
-            # Add fallback types
-            result["entity_types"].extend(fallbacks_to_add)
-
-        # Final check to ensure limits not exceeded (defensive programming)
-        if len(result["entity_types"]) > MAX_ENTITY_TYPES:
-            result["entity_types"] = result["entity_types"][:MAX_ENTITY_TYPES]
-
-        if len(result["edge_types"]) > MAX_EDGE_TYPES:
-            result["edge_types"] = result["edge_types"][:MAX_EDGE_TYPES]
+        # Hard caps
+        result["entity_types"] = result["entity_types"][:MAX_ENTITY_TYPES]
+        result["edge_types"] = result["edge_types"][:MAX_EDGE_TYPES]
 
         return result
     
