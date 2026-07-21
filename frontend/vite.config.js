@@ -8,7 +8,7 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
-    allowedHosts: ['ird.mu-sigma.com'],
+    allowedHosts: ['ird.mu-sigma.com', 'qa.ird.mu-sigma.com', '.ird.mu-sigma.com'],
     proxy: {
       '/mirofish/api': {
         target: 'http://localhost:5010',
