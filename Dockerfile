@@ -23,7 +23,10 @@ RUN npm ci \
 # 复制项目源码
 COPY . .
 
-EXPOSE 3000 5001
+# Build frontend for production (no HMR, stable under proxies)
+RUN npm run build
 
-# 同时启动前后端（开发模式）
-CMD ["npm", "run", "dev"]
+EXPOSE 3000 5010
+
+# Production: Flask backend + vite preview (serves built static dist)
+CMD ["npm", "run", "start"]
