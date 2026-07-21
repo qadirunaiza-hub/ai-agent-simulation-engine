@@ -6,16 +6,12 @@ variables:
   IMAGE_BASE: registry.ird.mu-sigma.com/devops/devops-2026/mirofish/mirofish-offline-musigma
   DEPLOY_HOST: "172.25.2.181"
   DEPLOY_USER: "dolores"
-  # DEPLOY_PASSWORD must be set in GitLab → Settings → CI/CD → Variables (mask it)
   QA_CONTAINER: "mirofish-qa"
   QA_PORT_FRONT: "3011"
   QA_PORT_BACK: "5004"
   NEO4J_NETWORK: "mirofish-offline_default"
   ENV_FILE: "/home/dolores/mirofish-offline/.env"
 
-# ── BUILD ────────────────────────────────────────────────────────────────────
-# Triggers on every branch push. Tags image as <branch>-<sha> and <branch>.
-# main branch also gets :prod tag.
 build:
   stage: build
   tags:
@@ -30,14 +26,11 @@ build:
       if [ "$CI_COMMIT_BRANCH" = "main" ]; then
         docker tag "${IMAGE_BASE}:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}" "${IMAGE_BASE}:prod"
         docker push "${IMAGE_BASE}:prod"
-        echo "Pushed :prod tag for main branch"
+        echo "Pushed :prod tag"
       fi
   only:
     - branches
 
-# ── DEPLOY QA ────────────────────────────────────────────────────────────────
-# Manual button in GitLab UI — SSHes into 172.25.2.181, pulls branch image,
-# restarts mirofish-qa on port 3011.
 deploy-qa:
   stage: deploy
   tags:
@@ -46,25 +39,21 @@ deploy-qa:
   script:
     - which sshpass || apt-get install -y sshpass 2>/dev/null || yum install -y sshpass 2>/dev/null
     - |
-      BRANCH_TAG="${IMAGE_BASE}:${CI_COMMIT_REF_SLUG}"
+      REMOTE_CMD="docker login -u '${CI_REGISTRY_USER}' -p '${CI_REGISTRY_PASSWORD}' registry.ird.mu-sigma.com \
+        && docker pull ${IMAGE_BASE}:${CI_COMMIT_REF_SLUG} \
+        && (docker stop ${QA_CONTAINER} 2>/dev/null; docker rm ${QA_CONTAINER} 2>/dev/null; true) \
+        && docker run -d \
+             --name ${QA_CONTAINER} \
+             --network ${NEO4J_NETWORK} \
+             --env-file ${ENV_FILE} \
+             -e NEO4J_URI=bolt://mirofish-neo4j:7687 \
+             -p ${QA_PORT_FRONT}:3000 \
+             -p ${QA_PORT_BACK}:5010 \
+             --restart unless-stopped \
+             ${IMAGE_BASE}:${CI_COMMIT_REF_SLUG} \
+        && echo 'mirofish-qa live at http://${DEPLOY_HOST}:${QA_PORT_FRONT}'"
       export SSHPASS="${DEPLOY_PASSWORD}"
-      sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-        ${DEPLOY_USER}@${DEPLOY_HOST} bash -s << ENDSSH
-        docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" registry.ird.mu-sigma.com
-        docker pull ${BRANCH_TAG}
-        docker stop ${QA_CONTAINER} 2>/dev/null || true
-        docker rm   ${QA_CONTAINER} 2>/dev/null || true
-        docker run -d \
-          --name ${QA_CONTAINER} \
-          --network ${NEO4J_NETWORK} \
-          --env-file ${ENV_FILE} \
-          -e NEO4J_URI=bolt://mirofish-neo4j:7687 \
-          -p ${QA_PORT_FRONT}:3000 \
-          -p ${QA_PORT_BACK}:5010 \
-          --restart unless-stopped \
-          ${BRANCH_TAG}
-        echo "mirofish-qa live at http://${DEPLOY_HOST}:${QA_PORT_FRONT}"
-ENDSSH
+      sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${DEPLOY_USER}@${DEPLOY_HOST}" "$REMOTE_CMD"
   only:
     - branches
   environment:
