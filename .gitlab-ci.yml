@@ -1,0 +1,67 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  IMAGE_BASE: registry.ird.mu-sigma.com/devops/devops-2026/mirofish/mirofish-offline-musigma
+  DEPLOY_HOST: "172.25.2.181"
+  DEPLOY_USER: "dolores"
+  QA_CONTAINER: "mirofish-qa"
+  QA_PORT_FRONT: "3011"
+  QA_PORT_BACK: "5004"
+  NEO4J_NETWORK: "mirofish-offline_default"
+  ENV_FILE: "/home/dolores/mirofish-offline/.env"
+
+# ── BUILD ────────────────────────────────────────────────────────────────────
+# Triggers on every branch push. Tags image as <branch>-<sha> and <branch>.
+# main branch also gets :prod tag.
+build:
+  stage: build
+  tags:
+    - shell
+  script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" registry.ird.mu-sigma.com
+    - docker build -t "${IMAGE_BASE}:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}" .
+    - docker tag "${IMAGE_BASE}:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}" "${IMAGE_BASE}:${CI_COMMIT_REF_SLUG}"
+    - docker push "${IMAGE_BASE}:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+    - docker push "${IMAGE_BASE}:${CI_COMMIT_REF_SLUG}"
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        docker tag "${IMAGE_BASE}:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}" "${IMAGE_BASE}:prod"
+        docker push "${IMAGE_BASE}:prod"
+        echo "Pushed :prod tag for main branch"
+      fi
+  only:
+    - branches
+
+# ── DEPLOY QA ────────────────────────────────────────────────────────────────
+# Manual button in GitLab UI — pulls the branch image and restarts mirofish-qa.
+deploy-qa:
+  stage: deploy
+  tags:
+    - shell
+  when: manual
+  script:
+    - |
+      BRANCH_TAG="${IMAGE_BASE}:${CI_COMMIT_REF_SLUG}"
+      ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} bash << EOF
+        docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" registry.ird.mu-sigma.com
+        docker pull ${BRANCH_TAG}
+        docker stop ${QA_CONTAINER} 2>/dev/null || true
+        docker rm   ${QA_CONTAINER} 2>/dev/null || true
+        docker run -d \
+          --name ${QA_CONTAINER} \
+          --network ${NEO4J_NETWORK} \
+          --env-file ${ENV_FILE} \
+          -e NEO4J_URI=bolt://mirofish-neo4j:7687 \
+          -p ${QA_PORT_FRONT}:3000 \
+          -p ${QA_PORT_BACK}:5010 \
+          --restart unless-stopped \
+          ${BRANCH_TAG}
+        echo "mirofish-qa running at http://${DEPLOY_HOST}:${QA_PORT_FRONT}"
+      EOF
+  only:
+    - branches
+  environment:
+    name: qa
+    url: http://172.25.2.181:3011
