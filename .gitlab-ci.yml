@@ -6,6 +6,7 @@ variables:
   IMAGE_BASE: registry.ird.mu-sigma.com/devops/devops-2026/mirofish/mirofish-offline-musigma
   DEPLOY_HOST: "172.25.2.181"
   DEPLOY_USER: "dolores"
+  # DEPLOY_PASSWORD must be set in GitLab → Settings → CI/CD → Variables (mask it)
   QA_CONTAINER: "mirofish-qa"
   QA_PORT_FRONT: "3011"
   QA_PORT_BACK: "5004"
@@ -35,16 +36,20 @@ build:
     - branches
 
 # ── DEPLOY QA ────────────────────────────────────────────────────────────────
-# Manual button in GitLab UI — pulls the branch image and restarts mirofish-qa.
+# Manual button in GitLab UI — SSHes into 172.25.2.181, pulls branch image,
+# restarts mirofish-qa on port 3011.
 deploy-qa:
   stage: deploy
   tags:
     - shell
   when: manual
   script:
+    - which sshpass || apt-get install -y sshpass 2>/dev/null || yum install -y sshpass 2>/dev/null
     - |
       BRANCH_TAG="${IMAGE_BASE}:${CI_COMMIT_REF_SLUG}"
-      ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} bash << EOF
+      export SSHPASS="${DEPLOY_PASSWORD}"
+      sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        ${DEPLOY_USER}@${DEPLOY_HOST} bash -s << ENDSSH
         docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" registry.ird.mu-sigma.com
         docker pull ${BRANCH_TAG}
         docker stop ${QA_CONTAINER} 2>/dev/null || true
@@ -58,8 +63,8 @@ deploy-qa:
           -p ${QA_PORT_BACK}:5010 \
           --restart unless-stopped \
           ${BRANCH_TAG}
-        echo "mirofish-qa running at http://${DEPLOY_HOST}:${QA_PORT_FRONT}"
-      EOF
+        echo "mirofish-qa live at http://${DEPLOY_HOST}:${QA_PORT_FRONT}"
+ENDSSH
   only:
     - branches
   environment:
